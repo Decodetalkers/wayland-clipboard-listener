@@ -5,7 +5,8 @@ use wayland_client::{
 };
 
 use wayland_protocols_wlr::data_control::v1::client::{
-    zwlr_data_control_device_v1, zwlr_data_control_manager_v1, zwlr_data_control_source_v1,
+    zwlr_data_control_device_v1, zwlr_data_control_manager_v1, zwlr_data_control_offer_v1,
+    zwlr_data_control_source_v1,
 };
 
 fn main() {
@@ -38,7 +39,7 @@ fn main() {
     println!("get seat name: {}", state.seat_name.as_ref().unwrap());
 
     state.set_data_device(&qhandle);
-    //event_created_child!()
+
     loop {
         if let Err(e) = event_queue.roundtrip(&mut state) {
             println!("error: {e}");
@@ -62,9 +63,9 @@ impl State {
     fn set_data_device(&mut self, qh: &wayland_client::QueueHandle<Self>) {
         let seat = self.seat.as_ref().unwrap();
         let manager = self.data_manager.as_ref().unwrap();
-        //let source = manager.create_data_source(qh, ());
+        let source = manager.create_data_source(qh, ());
         let device = manager.get_data_device(seat, qh, ());
-        //device.set_selection(Some(&source));
+        device.set_selection(Some(&source));
         self.data_device = Some(device);
     }
 }
@@ -99,9 +100,6 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                 );
             }
         }
-        //if state.data_manager.is_some() && state.seat.is_some() && state.data_device.is_none() {
-        //    state.set_data_device(qh);
-        //}
     }
 }
 
@@ -142,9 +140,12 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for Stat
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
         println!("{:?}", event);
+        if let zwlr_data_control_device_v1::Event::DataOffer { id } = event {
+            println!("{:?}", id);
+        }
     }
     event_created_child!(State, zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, [
-        zwlr_data_control_device_v1::EVT_DATA_OFFER_OPCODE => (zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ())
+        zwlr_data_control_device_v1::EVT_DATA_OFFER_OPCODE => (zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ())
     ]);
 }
 impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()> for State {
@@ -152,6 +153,18 @@ impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()> for Stat
         _state: &mut Self,
         _proxy: &zwlr_data_control_source_v1::ZwlrDataControlSourceV1,
         _event: <zwlr_data_control_source_v1::ZwlrDataControlSourceV1 as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &wayland_client::QueueHandle<Self>,
+    ) {
+    }
+}
+
+impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()> for State {
+    fn event(
+        _state: &mut Self,
+        _proxy: &zwlr_data_control_offer_v1::ZwlrDataControlOfferV1,
+        _event: <zwlr_data_control_offer_v1::ZwlrDataControlOfferV1 as Proxy>::Event,
         _data: &(),
         _conn: &Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
