@@ -31,9 +31,7 @@ fn main() {
     }
     println!("{:?}", state.data_device);
     loop {
-        println!("sss");
         event_queue.blocking_dispatch(&mut state).unwrap();
-        println!("sss");
     }
 }
 
@@ -45,7 +43,7 @@ struct State {
 
 impl State {
     fn device_ready(&self) -> bool {
-        self.seat.is_some() && self.data_manager.is_some()
+        self.seat.is_some() && self.data_manager.is_some() && self.data_device.is_some()
     }
     fn set_data_device(&mut self, qh: &wayland_client::QueueHandle<Self>) {
         let seat = self.seat.as_ref().unwrap();
@@ -87,7 +85,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                 );
             }
         }
-        if state.device_ready() {
+        if state.data_manager.is_some() && state.seat.is_some() && state.data_device.is_none() {
             state.set_data_device(qh);
         }
     }
