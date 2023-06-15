@@ -23,6 +23,7 @@ fn main() {
         seat_name: None,
         data_manager: None,
         data_device: None,
+        mime_types: Vec::new(),
     };
 
     event_queue.blocking_dispatch(&mut state).unwrap();
@@ -53,6 +54,7 @@ struct State {
     seat_name: Option<String>,
     data_manager: Option<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1>,
     data_device: Option<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1>,
+    mime_types: Vec<String>,
 }
 
 impl State {
@@ -66,7 +68,12 @@ impl State {
         let source = manager.create_data_source(qh, ());
         let device = manager.get_data_device(seat, qh, ());
         device.set_selection(Some(&source));
+
         self.data_device = Some(device);
+    }
+
+    fn is_text(&self) -> bool {
+        !self.mime_types.is_empty() && self.mime_types[0] == "text/plain;charset=utf-8"
     }
 }
 
@@ -132,16 +139,29 @@ impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()> for St
 
 impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for State {
     fn event(
-        _state: &mut Self,
+        state: &mut Self,
         _proxy: &zwlr_data_control_device_v1::ZwlrDataControlDeviceV1,
         event: <zwlr_data_control_device_v1::ZwlrDataControlDeviceV1 as Proxy>::Event,
         _data: &(),
         _conn: &Connection,
-        _qhandle: &wayland_client::QueueHandle<Self>,
+        qh: &wayland_client::QueueHandle<Self>,
     ) {
-        println!("{:?}", event);
+        #[allow(unused)]
         if let zwlr_data_control_device_v1::Event::DataOffer { id } = event {
-            println!("{:?}", id);
+            if state.is_text() {
+                println!("receive text");
+            }
+        } else if let zwlr_data_control_device_v1::Event::Finished = event {
+            let source = state
+                .data_manager
+                .as_ref()
+                .unwrap()
+                .create_data_source(qh, ());
+            state
+                .data_device
+                .as_ref()
+                .unwrap()
+                .set_selection(Some(&source));
         }
     }
     event_created_child!(State, zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, [
@@ -152,22 +172,28 @@ impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()> for Stat
     fn event(
         _state: &mut Self,
         _proxy: &zwlr_data_control_source_v1::ZwlrDataControlSourceV1,
-        _event: <zwlr_data_control_source_v1::ZwlrDataControlSourceV1 as Proxy>::Event,
+        event: <zwlr_data_control_source_v1::ZwlrDataControlSourceV1 as Proxy>::Event,
         _data: &(),
         _conn: &Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
+        println!("{event:?}");
     }
 }
 
 impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()> for State {
     fn event(
-        _state: &mut Self,
+        state: &mut Self,
         _proxy: &zwlr_data_control_offer_v1::ZwlrDataControlOfferV1,
-        _event: <zwlr_data_control_offer_v1::ZwlrDataControlOfferV1 as Proxy>::Event,
+        event: <zwlr_data_control_offer_v1::ZwlrDataControlOfferV1 as Proxy>::Event,
         _data: &(),
         _conn: &Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
+        if let zwlr_data_control_offer_v1::Event::Offer { mime_type } = event {
+            state.mime_types.clear();
+            let mime_types: Vec<String> = mime_type.lines().map(|line| line.to_string()).collect();
+            state.mime_types = mime_types;
+        }
     }
 }
