@@ -1,7 +1,9 @@
 use wayland_client::{
+    event_created_child,
     protocol::{wl_registry, wl_seat},
     Connection, Dispatch, Proxy,
 };
+
 use wayland_protocols_wlr::data_control::v1::client::{
     zwlr_data_control_device_v1, zwlr_data_control_manager_v1, zwlr_data_control_source_v1,
 };
@@ -17,40 +19,52 @@ fn main() {
     display.get_registry(&qhandle, ());
     let mut state = State {
         seat: None,
+        seat_name: None,
         data_manager: None,
         data_device: None,
     };
 
     event_queue.blocking_dispatch(&mut state).unwrap();
 
-    println!("{:?}", state.seat);
-    println!("{:?}", state.data_manager);
     if !state.device_ready() {
         eprintln!("Cannot get seat and data maanger");
         return;
     }
-    println!("{:?}", state.data_device);
+
+    while state.seat_name.is_none() {
+        event_queue.roundtrip(&mut state).unwrap();
+    }
+
+    println!("get seat name: {}", state.seat_name.as_ref().unwrap());
+
+    state.set_data_device(&qhandle);
+    //event_created_child!()
     loop {
-        event_queue.blocking_dispatch(&mut state).unwrap();
+        if let Err(e) = event_queue.roundtrip(&mut state) {
+            println!("error: {e}");
+            break;
+        };
     }
 }
 
 struct State {
     seat: Option<wl_seat::WlSeat>,
+    seat_name: Option<String>,
     data_manager: Option<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1>,
     data_device: Option<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1>,
 }
 
 impl State {
     fn device_ready(&self) -> bool {
-        self.seat.is_some() && self.data_manager.is_some() && self.data_device.is_some()
+        self.seat.is_some() && self.data_manager.is_some()
     }
+
     fn set_data_device(&mut self, qh: &wayland_client::QueueHandle<Self>) {
         let seat = self.seat.as_ref().unwrap();
         let manager = self.data_manager.as_ref().unwrap();
-        let source = manager.create_data_source(qh, ());
+        //let source = manager.create_data_source(qh, ());
         let device = manager.get_data_device(seat, qh, ());
-        device.set_selection(Some(&source));
+        //device.set_selection(Some(&source));
         self.data_device = Some(device);
     }
 }
@@ -85,22 +99,24 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                 );
             }
         }
-        if state.data_manager.is_some() && state.seat.is_some() && state.data_device.is_none() {
-            state.set_data_device(qh);
-        }
+        //if state.data_manager.is_some() && state.seat.is_some() && state.data_device.is_none() {
+        //    state.set_data_device(qh);
+        //}
     }
 }
 
 impl Dispatch<wl_seat::WlSeat, ()> for State {
     fn event(
-        _state: &mut Self,
+        state: &mut Self,
         _proxy: &wl_seat::WlSeat,
-        _event: <wl_seat::WlSeat as Proxy>::Event,
+        event: <wl_seat::WlSeat as Proxy>::Event,
         _data: &(),
         _conn: &wayland_client::Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
-        println!("sss");
+        if let wl_seat::Event::Name { name } = event {
+            state.seat_name = Some(name);
+        }
     }
 }
 
@@ -113,7 +129,6 @@ impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()> for St
         _conn: &wayland_client::Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
-        println!("sss");
     }
 }
 
@@ -128,6 +143,9 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for Stat
     ) {
         println!("{:?}", event);
     }
+    event_created_child!(State, zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, [
+        zwlr_data_control_device_v1::EVT_DATA_OFFER_OPCODE => (zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ())
+    ]);
 }
 impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()> for State {
     fn event(
