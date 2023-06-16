@@ -9,7 +9,6 @@ use wayland_protocols_wlr::data_control::v1::client::{
 };
 
 use std::sync::{Arc, Mutex};
-use std::{thread, time};
 
 use thiserror::Error;
 
@@ -26,6 +25,11 @@ pub enum WlListenType {
     ListenOnCopy,
 }
 
+/// Error
+/// it describe three kind of error
+/// 1. failed when init
+/// 2. failed in queue
+/// 3. failed in pipereader
 #[derive(Error, Debug)]
 pub enum WlClipboardListenerError {
     #[error("Init Failed")]
@@ -36,6 +40,10 @@ pub enum WlClipboardListenerError {
     PipeError,
 }
 
+/// context
+/// here describe two types of context
+/// 1. text, just string
+/// 2. file , with [u8]
 #[derive(Debug)]
 pub enum ClipBoardListenContext {
     Text(String),
@@ -48,8 +56,10 @@ pub struct ClipBoardListenMessage {
     pub context: ClipBoardListenContext,
 }
 
+/// Stream, provide a iter to listen to clipboard
+/// Note, the iter will loop very fast, you would better to use thread sleep
+/// or iter you self
 pub struct WlClipboardListenerStream {
-    sleeptime: time::Duration,
     listentype: WlListenType,
     seat: Option<wl_seat::WlSeat>,
     seat_name: Option<String>,
@@ -64,24 +74,18 @@ impl Iterator for WlClipboardListenerStream {
     type Item = Result<Option<ClipBoardListenMessage>, WlClipboardListenerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        thread::sleep(self.sleeptime);
         Some(self.get_clipboard())
     }
 }
 
 impl WlClipboardListenerStream {
-    /// init_with_time, there will set a loop time for iter
     /// ```
-    /// use std::time;
     /// use wayland_clipboard_listener::WlClipboardListenerStream;
     /// use wayland_clipboard_listener::WlListenType;
     ///
-    /// let stream = WlClipboardListenerStream::init_with_time(WlListenType::ListenOnSelect, time::Duration::from_millis(100)).unwrap();
+    /// let stream = WlClipboardListenerStream::init(WlListenType::ListenOnSelect).unwrap();
     /// ```
-    pub fn init_with_time(
-        listentype: WlListenType,
-        sleeptime: time::Duration,
-    ) -> Result<Self, WlClipboardListenerError> {
+    pub fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
         let conn = Connection::connect_to_env().map_err(|_| {
             WlClipboardListenerError::InitFailed("Cannot connect to wayland".to_string())
         })?;
@@ -93,7 +97,6 @@ impl WlClipboardListenerStream {
 
         display.get_registry(&qhandle, ());
         let mut state = WlClipboardListenerStream {
-            sleeptime,
             listentype,
             seat: None,
             seat_name: None,
@@ -123,17 +126,6 @@ impl WlClipboardListenerStream {
         state.set_data_device(&qhandle);
         state.queue = Some(Arc::new(Mutex::new(event_queue)));
         Ok(state)
-    }
-
-    /// this will set iter time to 100 ms
-    /// ```
-    /// use wayland_clipboard_listener::WlClipboardListenerStream;
-    /// use wayland_clipboard_listener::WlListenType;
-    ///
-    /// let stream = WlClipboardListenerStream::init(WlListenType::ListenOnSelect).unwrap();
-    /// ```
-    pub fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
-        Self::init_with_time(listentype, time::Duration::from_millis(100))
     }
 
     fn state_queue(&mut self) -> Result<(), WlClipboardListenerError> {
