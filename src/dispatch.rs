@@ -89,41 +89,45 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
         _conn: &Connection,
         qh: &wayland_client::QueueHandle<Self>,
     ) {
-        if let zwlr_data_control_device_v1::Event::DataOffer { id } = event {
-            if let WlListenType::ListenOnHover = state.listentype {
-                let (read, write) = pipe().unwrap();
-                id.receive(TEXT.to_string(), write.as_raw_fd());
-                drop(write);
-                state.pipereader = Some(read);
+        match event {
+            zwlr_data_control_device_v1::Event::DataOffer { id } => {
+                if let WlListenType::ListenOnHover = state.listentype {
+                    let (read, write) = pipe().unwrap();
+                    id.receive(TEXT.to_string(), write.as_raw_fd());
+                    drop(write);
+                    state.pipereader = Some(read);
+                }
             }
-        } else if let zwlr_data_control_device_v1::Event::Finished = event {
-            let source = state
-                .data_manager
-                .as_ref()
-                .unwrap()
-                .create_data_source(qh, ());
-            state
-                .data_device
-                .as_ref()
-                .unwrap()
-                .set_selection(Some(&source));
-        } else if let zwlr_data_control_device_v1::Event::PrimarySelection { id: Some(offer) } =
-            event
-        {
-            offer.destroy();
-        } else if let zwlr_data_control_device_v1::Event::Selection { id: Some(offer) } = event {
-            if let WlListenType::ListenOnCopy = state.listentype {
-                // TODO: how can I handle the mimetype?
-                let mimetype = if state.is_text() || state.mime_types.is_empty() {
-                    TEXT.to_string()
-                } else {
-                    state.mime_types[0].clone()
-                };
-                let (read, write) = pipe().unwrap();
-                offer.receive(mimetype, write.as_raw_fd());
-                drop(write);
-                state.pipereader = Some(read);
+            zwlr_data_control_device_v1::Event::Finished => {
+                let source = state
+                    .data_manager
+                    .as_ref()
+                    .unwrap()
+                    .create_data_source(qh, ());
+                state
+                    .data_device
+                    .as_ref()
+                    .unwrap()
+                    .set_selection(Some(&source));
             }
+            zwlr_data_control_device_v1::Event::PrimarySelection { id: Some(offer) } => {
+                offer.destroy();
+            }
+            zwlr_data_control_device_v1::Event::Selection { id: Some(offer) } => {
+                if let WlListenType::ListenOnCopy = state.listentype {
+                    // TODO: how can I handle the mimetype?
+                    let mimetype = if state.is_text() || state.mime_types.is_empty() {
+                        TEXT.to_string()
+                    } else {
+                        state.mime_types[0].clone()
+                    };
+                    let (read, write) = pipe().unwrap();
+                    offer.receive(mimetype, write.as_raw_fd());
+                    drop(write);
+                    state.pipereader = Some(read);
+                }
+            }
+            _ => unimplemented!(),
         }
     }
     event_created_child!(WlClipboardListenerStream, zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, [
