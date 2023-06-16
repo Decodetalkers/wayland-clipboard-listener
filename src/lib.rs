@@ -65,7 +65,7 @@ impl WaylandCopyStream {
 
         event_queue
             .blocking_dispatch(&mut state)
-            .map_err(|e| WaylandCopyError::InitFailed(format!("Inital dispatch failed:{e}")))?;
+            .map_err(|e| WaylandCopyError::InitFailed(format!("Inital dispatch failed: {e}")))?;
 
         if !state.device_ready() {
             return Err(WaylandCopyError::InitFailed(
@@ -109,6 +109,7 @@ impl WaylandCopyStream {
             Ok(None)
         }
     }
+
     fn device_ready(&self) -> bool {
         self.seat.is_some() && self.data_manager.is_some()
     }
