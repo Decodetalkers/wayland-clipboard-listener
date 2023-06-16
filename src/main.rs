@@ -13,6 +13,7 @@ use wayland_protocols_wlr::data_control::v1::client::{
 
 use os_pipe::pipe;
 
+// TODO: just support text now
 const TEXT: &str = "text/plain;charset=utf-8";
 
 fn main() {
@@ -163,7 +164,6 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for Stat
         _conn: &Connection,
         qh: &wayland_client::QueueHandle<Self>,
     ) {
-        //println!("device event : {event:?}");
         if let zwlr_data_control_device_v1::Event::DataOffer { id } = event {
             if state.is_text() {
                 let (read, write) = pipe().unwrap();
