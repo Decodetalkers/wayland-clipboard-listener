@@ -70,6 +70,14 @@ impl Iterator for WlClipboardListenerStream {
 }
 
 impl WlClipboardListenerStream {
+    /// init_with_time, there will set a loop time for iter
+    /// ```
+    /// use std::time;
+    /// use wayland_clipboard_listener::WlClipboardListenerStream;
+    /// use wayland_clipboard_listener::WlListenType;
+    ///
+    /// let stream = WlClipboardListenerStream::init_with_time(WlListenType::ListenOnSelect, time::Duration::from_millis(100)).unwrap();
+    /// ```
     pub fn init_with_time(
         listentype: WlListenType,
         sleeptime: time::Duration,
@@ -117,6 +125,13 @@ impl WlClipboardListenerStream {
         Ok(state)
     }
 
+    /// this will set iter time to 100 ms
+    /// ```
+    /// use wayland_clipboard_listener::WlClipboardListenerStream;
+    /// use wayland_clipboard_listener::WlListenType;
+    ///
+    /// let stream = WlClipboardListenerStream::init(WlListenType::ListenOnSelect).unwrap();
+    /// ```
     pub fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
         Self::init_with_time(listentype, time::Duration::from_millis(100))
     }
