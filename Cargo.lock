@@ -292,6 +292,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "wayland-clipboard-listener"
+version = "0.1.0"
+dependencies = [
+ "os_pipe",
+ "thiserror",
+ "wayland-client",
+ "wayland-protocols",
+ "wayland-protocols-wlr",
+]
+
+[[package]]
 name = "wayland-protocols"
 version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -336,17 +347,6 @@ dependencies = [
  "dlib",
  "log",
  "pkg-config",
-]
-
-[[package]]
-name = "waylandcopy"
-version = "0.1.0"
-dependencies = [
- "os_pipe",
- "thiserror",
- "wayland-client",
- "wayland-protocols",
- "wayland-protocols-wlr",
 ]
 
 [[package]]

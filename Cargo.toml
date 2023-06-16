@@ -1,5 +1,5 @@
 [package]
-name = "waylandcopy"
+name = "wayland-clipboard-listener"
 version = "0.1.0"
 edition = "2021"
 

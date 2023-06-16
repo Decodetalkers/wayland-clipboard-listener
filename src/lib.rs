@@ -15,7 +15,7 @@ use thiserror::Error;
 use constvar::TEXT;
 
 #[derive(Error, Debug)]
-pub enum WaylandCopyError {
+pub enum WlClipboardListenerError {
     #[error("Init Failed")]
     InitFailed(String),
     #[error("Error during queue")]
@@ -24,7 +24,7 @@ pub enum WaylandCopyError {
     PipeError,
 }
 
-pub struct WaylandCopyStream {
+pub struct WlClipboardListenerStream {
     seat: Option<wl_seat::WlSeat>,
     seat_name: Option<String>,
     data_manager: Option<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1>,
@@ -34,18 +34,18 @@ pub struct WaylandCopyStream {
     queue: Option<Arc<Mutex<EventQueue<Self>>>>,
 }
 
-impl Iterator for WaylandCopyStream {
-    type Item = Result<Option<String>, WaylandCopyError>;
+impl Iterator for WlClipboardListenerStream {
+    type Item = Result<Option<String>, WlClipboardListenerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.get_clipboard())
     }
 }
 
-impl WaylandCopyStream {
-    pub fn init() -> Result<Self, WaylandCopyError> {
+impl WlClipboardListenerStream {
+    pub fn init() -> Result<Self, WlClipboardListenerError> {
         let conn = Connection::connect_to_env()
-            .map_err(|_| WaylandCopyError::InitFailed("Cannot connect to wayland".to_string()))?;
+            .map_err(|_| WlClipboardListenerError::InitFailed("Cannot connect to wayland".to_string()))?;
 
         let mut event_queue = conn.new_event_queue();
         let qhandle = event_queue.handle();
@@ -53,7 +53,7 @@ impl WaylandCopyStream {
         let display = conn.display();
 
         display.get_registry(&qhandle, ());
-        let mut state = WaylandCopyStream {
+        let mut state = WlClipboardListenerStream {
             seat: None,
             seat_name: None,
             data_manager: None,
@@ -65,17 +65,17 @@ impl WaylandCopyStream {
 
         event_queue
             .blocking_dispatch(&mut state)
-            .map_err(|e| WaylandCopyError::InitFailed(format!("Inital dispatch failed: {e}")))?;
+            .map_err(|e| WlClipboardListenerError::InitFailed(format!("Inital dispatch failed: {e}")))?;
 
         if !state.device_ready() {
-            return Err(WaylandCopyError::InitFailed(
+            return Err(WlClipboardListenerError::InitFailed(
                 "Cannot get seat and data manager".to_string(),
             ));
         }
 
         while state.seat_name.is_none() {
             event_queue.roundtrip(&mut state).map_err(|_| {
-                WaylandCopyError::InitFailed("Cannot roundtrip during init".to_string())
+                WlClipboardListenerError::InitFailed("Cannot roundtrip during init".to_string())
             })?;
         }
 
@@ -84,25 +84,25 @@ impl WaylandCopyStream {
         Ok(state)
     }
 
-    fn state_queue(&mut self) -> Result<(), WaylandCopyError> {
+    fn state_queue(&mut self) -> Result<(), WlClipboardListenerError> {
         let queue = self.queue.clone().unwrap();
         let mut queue = queue
             .lock()
-            .map_err(|e| WaylandCopyError::QueueError(e.to_string()))?;
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         queue
             .roundtrip(self)
-            .map_err(|e| WaylandCopyError::QueueError(e.to_string()))?;
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         Ok(())
     }
 
-    fn get_clipboard(&mut self) -> Result<Option<String>, WaylandCopyError> {
+    fn get_clipboard(&mut self) -> Result<Option<String>, WlClipboardListenerError> {
         self.state_queue()?;
         if self.pipereader.is_some() {
             self.state_queue()?;
             let mut read = self.pipereader.as_ref().unwrap();
             let mut context = String::new();
             read.read_to_string(&mut context)
-                .map_err(|_| WaylandCopyError::PipeError)?;
+                .map_err(|_| WlClipboardListenerError::PipeError)?;
             self.pipereader = None;
             Ok(Some(context))
         } else {

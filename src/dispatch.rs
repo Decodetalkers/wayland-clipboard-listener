@@ -1,4 +1,4 @@
-use super::WaylandCopyStream;
+use super::WlClipboardListenerStream;
 
 use std::os::fd::AsRawFd;
 
@@ -16,7 +16,7 @@ use wayland_protocols_wlr::data_control::v1::client::{
 
 use crate::constvar::TEXT;
 
-impl Dispatch<wl_registry::WlRegistry, ()> for WaylandCopyStream {
+impl Dispatch<wl_registry::WlRegistry, ()> for WlClipboardListenerStream {
     fn event(
         state: &mut Self,
         registry: &wl_registry::WlRegistry,
@@ -49,7 +49,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for WaylandCopyStream {
     }
 }
 
-impl Dispatch<wl_seat::WlSeat, ()> for WaylandCopyStream {
+impl Dispatch<wl_seat::WlSeat, ()> for WlClipboardListenerStream {
     fn event(
         state: &mut Self,
         _proxy: &wl_seat::WlSeat,
@@ -64,7 +64,7 @@ impl Dispatch<wl_seat::WlSeat, ()> for WaylandCopyStream {
     }
 }
 
-impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()> for WaylandCopyStream {
+impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()> for WlClipboardListenerStream {
     fn event(
         _state: &mut Self,
         _proxy: &zwlr_data_control_manager_v1::ZwlrDataControlManagerV1,
@@ -76,7 +76,7 @@ impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()> for Wa
     }
 }
 
-impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for WaylandCopyStream {
+impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for WlClipboardListenerStream {
     fn event(
         state: &mut Self,
         _proxy: &zwlr_data_control_device_v1::ZwlrDataControlDeviceV1,
@@ -110,12 +110,12 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for Wayl
             offer.destroy();
         }
     }
-    event_created_child!(WaylandCopyStream, zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, [
+    event_created_child!(WlClipboardListenerStream, zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, [
         zwlr_data_control_device_v1::EVT_DATA_OFFER_OPCODE => (zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ())
     ]);
 }
 
-impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()> for WaylandCopyStream {
+impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()> for WlClipboardListenerStream {
     fn event(
         _state: &mut Self,
         _proxy: &zwlr_data_control_source_v1::ZwlrDataControlSourceV1,
@@ -128,7 +128,7 @@ impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()> for Wayl
     }
 }
 
-impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()> for WaylandCopyStream {
+impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()> for WlClipboardListenerStream {
     fn event(
         state: &mut Self,
         _proxy: &zwlr_data_control_offer_v1::ZwlrDataControlOfferV1,
