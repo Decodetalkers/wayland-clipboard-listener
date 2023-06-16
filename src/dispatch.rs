@@ -14,7 +14,7 @@ use wayland_protocols_wlr::data_control::v1::client::{
     zwlr_data_control_source_v1,
 };
 
-use crate::constvar::TEXT;
+use crate::{constvar::TEXT, WlListenType};
 
 impl Dispatch<wl_registry::WlRegistry, ()> for WlClipboardListenerStream {
     fn event(
@@ -90,10 +90,12 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
         qh: &wayland_client::QueueHandle<Self>,
     ) {
         if let zwlr_data_control_device_v1::Event::DataOffer { id } = event {
-            let (read, write) = pipe().unwrap();
-            id.receive(TEXT.to_string(), write.as_raw_fd());
-            drop(write);
-            state.pipereader = Some(read);
+            if let WlListenType::ListenOnHover = state.listentype {
+                let (read, write) = pipe().unwrap();
+                id.receive(TEXT.to_string(), write.as_raw_fd());
+                drop(write);
+                state.pipereader = Some(read);
+            }
         } else if let zwlr_data_control_device_v1::Event::Finished = event {
             let source = state
                 .data_manager
@@ -109,6 +111,19 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
             event
         {
             offer.destroy();
+        } else if let zwlr_data_control_device_v1::Event::Selection { id: Some(offer) } = event {
+            if let WlListenType::ListenOnCopy = state.listentype {
+                // TODO: how can I handle the mimetype?
+                let mimetype = if state.is_text() || state.mime_types.is_empty() {
+                    TEXT.to_string()
+                } else {
+                    state.mime_types[0].clone()
+                };
+                let (read, write) = pipe().unwrap();
+                offer.receive(mimetype, write.as_raw_fd());
+                drop(write);
+                state.pipereader = Some(read);
+            }
         }
     }
     event_created_child!(WlClipboardListenerStream, zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, [

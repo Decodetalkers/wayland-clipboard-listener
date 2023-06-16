@@ -14,6 +14,17 @@ use thiserror::Error;
 
 use constvar::TEXT;
 
+/// listentype
+/// if ListenOnHover, it wll be useful for translation apps, but in dispatch, we cannot know the
+/// mime_types, it can only handle text
+///
+/// ListenOnCopy will get the full mimetype, but you should copy to enable the listen,
+#[derive(Debug)]
+pub enum WlListenType {
+    ListenOnHover,
+    ListenOnCopy,
+}
+
 #[derive(Error, Debug)]
 pub enum WlClipboardListenerError {
     #[error("Init Failed")]
@@ -37,6 +48,7 @@ pub struct ClipBoardListenMessage {
 }
 
 pub struct WlClipboardListenerStream {
+    listentype: WlListenType,
     seat: Option<wl_seat::WlSeat>,
     seat_name: Option<String>,
     data_manager: Option<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1>,
@@ -55,7 +67,7 @@ impl Iterator for WlClipboardListenerStream {
 }
 
 impl WlClipboardListenerStream {
-    pub fn init() -> Result<Self, WlClipboardListenerError> {
+    pub fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
         let conn = Connection::connect_to_env().map_err(|_| {
             WlClipboardListenerError::InitFailed("Cannot connect to wayland".to_string())
         })?;
@@ -67,6 +79,7 @@ impl WlClipboardListenerStream {
 
         display.get_registry(&qhandle, ());
         let mut state = WlClipboardListenerStream {
+            listentype,
             seat: None,
             seat_name: None,
             data_manager: None,
@@ -108,7 +121,9 @@ impl WlClipboardListenerStream {
         Ok(())
     }
 
-    fn get_clipboard(&mut self) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
+    fn get_clipboard(
+        &mut self,
+    ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
         self.state_queue()?;
         if self.pipereader.is_some() {
             self.state_queue()?;
@@ -120,7 +135,10 @@ impl WlClipboardListenerStream {
                 self.pipereader = None;
                 let mime_types = self.mime_types.clone();
                 self.mime_types.clear();
-                Ok(Some(ClipBoardListenMessage { mime_types, context: ClipBoardListenContext::Text(context) }))
+                Ok(Some(ClipBoardListenMessage {
+                    mime_types,
+                    context: ClipBoardListenContext::Text(context),
+                }))
             } else {
                 let mut context = vec![];
                 read.read_to_end(&mut context)
@@ -128,7 +146,15 @@ impl WlClipboardListenerStream {
                 self.pipereader = None;
                 let mime_types = self.mime_types.clone();
                 self.mime_types.clear();
-                Ok(Some(ClipBoardListenMessage { mime_types, context: ClipBoardListenContext::File(context) }))
+                // it is hover type, it will not receive the context
+                if let WlListenType::ListenOnCopy = self.listentype {
+                    Ok(None)
+                } else {
+                    Ok(Some(ClipBoardListenMessage {
+                        mime_types,
+                        context: ClipBoardListenContext::File(context),
+                    }))
+                }
             }
         } else {
             Ok(None)
