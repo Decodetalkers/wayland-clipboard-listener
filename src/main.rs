@@ -4,6 +4,6 @@ fn main() {
     let stream = WlClipboardListenerStream::init().unwrap();
 
     for context in stream.flatten().flatten() {
-        println!("{context}");
+        println!("{context:?}");
     }
 }

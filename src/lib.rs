@@ -24,6 +24,18 @@ pub enum WlClipboardListenerError {
     PipeError,
 }
 
+#[derive(Debug)]
+pub enum ClipBoardListenContext {
+    Text(String),
+    File(Vec<u8>),
+}
+
+#[derive(Debug)]
+pub struct ClipBoardListenMessage {
+    pub mime_types: Vec<String>,
+    pub context: ClipBoardListenContext,
+}
+
 pub struct WlClipboardListenerStream {
     seat: Option<wl_seat::WlSeat>,
     seat_name: Option<String>,
@@ -35,7 +47,7 @@ pub struct WlClipboardListenerStream {
 }
 
 impl Iterator for WlClipboardListenerStream {
-    type Item = Result<Option<String>, WlClipboardListenerError>;
+    type Item = Result<Option<ClipBoardListenMessage>, WlClipboardListenerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.get_clipboard())
@@ -96,16 +108,28 @@ impl WlClipboardListenerStream {
         Ok(())
     }
 
-    fn get_clipboard(&mut self) -> Result<Option<String>, WlClipboardListenerError> {
+    fn get_clipboard(&mut self) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
         self.state_queue()?;
         if self.pipereader.is_some() {
             self.state_queue()?;
             let mut read = self.pipereader.as_ref().unwrap();
-            let mut context = String::new();
-            read.read_to_string(&mut context)
-                .map_err(|_| WlClipboardListenerError::PipeError)?;
-            self.pipereader = None;
-            Ok(Some(context))
+            if self.is_text() {
+                let mut context = String::new();
+                read.read_to_string(&mut context)
+                    .map_err(|_| WlClipboardListenerError::PipeError)?;
+                self.pipereader = None;
+                let mime_types = self.mime_types.clone();
+                self.mime_types.clear();
+                Ok(Some(ClipBoardListenMessage { mime_types, context: ClipBoardListenContext::Text(context) }))
+            } else {
+                let mut context = vec![];
+                read.read_to_end(&mut context)
+                    .map_err(|_| WlClipboardListenerError::PipeError)?;
+                self.pipereader = None;
+                let mime_types = self.mime_types.clone();
+                self.mime_types.clear();
+                Ok(Some(ClipBoardListenMessage { mime_types, context: ClipBoardListenContext::File(context) }))
+            }
         } else {
             Ok(None)
         }

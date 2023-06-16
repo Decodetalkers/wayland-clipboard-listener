@@ -90,13 +90,10 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
         qh: &wayland_client::QueueHandle<Self>,
     ) {
         if let zwlr_data_control_device_v1::Event::DataOffer { id } = event {
-            if state.is_text() {
-                let (read, write) = pipe().unwrap();
-                id.receive(TEXT.to_string(), write.as_raw_fd());
-                drop(write);
-                state.pipereader = Some(read);
-                state.mime_types.clear();
-            }
+            let (read, write) = pipe().unwrap();
+            id.receive(TEXT.to_string(), write.as_raw_fd());
+            drop(write);
+            state.pipereader = Some(read);
         } else if let zwlr_data_control_device_v1::Event::Finished = event {
             let source = state
                 .data_manager
