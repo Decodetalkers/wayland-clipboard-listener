@@ -128,7 +128,10 @@ impl WlClipboardListenerStream {
         Ok(state)
     }
 
-    fn state_queue(&mut self) -> Result<(), WlClipboardListenerError> {
+    fn get_clipboard(
+        &mut self,
+    ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
+        // get queue, start blocking_dispatch for first loop
         let queue = self.queue.clone().unwrap();
         let mut queue = queue
             .lock()
@@ -136,26 +139,11 @@ impl WlClipboardListenerStream {
         queue
             .blocking_dispatch(self)
             .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
-        Ok(())
-    }
-
-    fn state_queue_sync(&mut self) -> Result<(), WlClipboardListenerError> {
-        let queue = self.queue.clone().unwrap();
-        let mut queue = queue
-            .lock()
-            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
-        queue
-            .roundtrip(self)
-            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
-        Ok(())
-    }
-
-    fn get_clipboard(
-        &mut self,
-    ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
-        self.state_queue()?;
         if self.pipereader.is_some() {
-            self.state_queue_sync()?;
+            // roundtrip to init pipereader
+            queue
+                .roundtrip(self)
+                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
             let mut read = self.pipereader.as_ref().unwrap();
             if self.is_text() {
                 let mut context = String::new();
