@@ -2,7 +2,7 @@
 name = "wayland-clipboard-listener"
 version = "0.1.0"
 edition = "2021"
-license = "GPL-v3"
+license = "GPL-3.0"
 description = "impl wlr-data-control-unstable-v1, listen for clipboard"
 homepage = "https://github.com/Decodetalkers/wayland-clipboard-listener"
 authors = ["Decodertalkers <aakari@tutanota.com>"]
