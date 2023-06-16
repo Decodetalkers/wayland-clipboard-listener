@@ -145,6 +145,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "os_pipe"
+version = "1.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ae859aa07428ca9a929b936690f8b12dc5f11dd8c6992a18ca93919f28bc177"
+dependencies = [
+ "libc",
+ "windows-sys",
+]
+
+[[package]]
 name = "pkg-config"
 version = "0.3.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -332,6 +342,7 @@ dependencies = [
 name = "waylandcopy"
 version = "0.1.0"
 dependencies = [
+ "os_pipe",
  "wayland-client",
  "wayland-protocols",
  "wayland-protocols-wlr",

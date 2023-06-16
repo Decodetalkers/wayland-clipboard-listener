@@ -17,3 +17,4 @@ wayland-protocols-wlr = { version = "0.1.0", default-features = false, features 
 	"client",
 ] }
 wayland-client = { version = "0.30.1", features = ["calloop"] }
+os_pipe = "1.1.4"
