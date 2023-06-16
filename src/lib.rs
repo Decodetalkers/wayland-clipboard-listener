@@ -9,6 +9,7 @@ use wayland_protocols_wlr::data_control::v1::client::{
 };
 
 use std::sync::{Arc, Mutex};
+use std::{thread, time};
 
 use thiserror::Error;
 
@@ -48,6 +49,7 @@ pub struct ClipBoardListenMessage {
 }
 
 pub struct WlClipboardListenerStream {
+    sleeptime: time::Duration,
     listentype: WlListenType,
     seat: Option<wl_seat::WlSeat>,
     seat_name: Option<String>,
@@ -62,12 +64,16 @@ impl Iterator for WlClipboardListenerStream {
     type Item = Result<Option<ClipBoardListenMessage>, WlClipboardListenerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        thread::sleep(self.sleeptime);
         Some(self.get_clipboard())
     }
 }
 
 impl WlClipboardListenerStream {
-    pub fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
+    pub fn init_with_time(
+        listentype: WlListenType,
+        sleeptime: time::Duration,
+    ) -> Result<Self, WlClipboardListenerError> {
         let conn = Connection::connect_to_env().map_err(|_| {
             WlClipboardListenerError::InitFailed("Cannot connect to wayland".to_string())
         })?;
@@ -79,6 +85,7 @@ impl WlClipboardListenerStream {
 
         display.get_registry(&qhandle, ());
         let mut state = WlClipboardListenerStream {
+            sleeptime,
             listentype,
             seat: None,
             seat_name: None,
@@ -108,6 +115,10 @@ impl WlClipboardListenerStream {
         state.set_data_device(&qhandle);
         state.queue = Some(Arc::new(Mutex::new(event_queue)));
         Ok(state)
+    }
+
+    pub fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
+        Self::init_with_time(listentype, time::Duration::from_millis(100))
     }
 
     fn state_queue(&mut self) -> Result<(), WlClipboardListenerError> {
