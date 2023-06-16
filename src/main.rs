@@ -166,10 +166,7 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for Stat
         //println!("device event : {event:?}");
         if let zwlr_data_control_device_v1::Event::DataOffer { id } = event {
             if state.is_text() {
-                //println!("receive text");
-                //let (read, mut write) = pipe().unwrap();
                 let (read, write) = pipe().unwrap();
-                //write.write_all(b"sssss").unwrap();
                 id.receive(TEXT.to_string(), write.as_raw_fd());
                 drop(write);
                 state.pipereader = Some(read);
@@ -187,16 +184,6 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for Stat
                 .unwrap()
                 .set_selection(Some(&source));
         } else if let zwlr_data_control_device_v1::Event::PrimarySelection { id } = event {
-            //let source = state
-            //    .data_manager
-            //    .as_ref()
-            //    .unwrap()
-            //    .create_data_source(qh, ());
-            //state
-            //    .data_device
-            //    .as_ref()
-            //    .unwrap()
-            //    .set_selection(Some(&source));
             if let Some(offer) = id {
                 offer.destroy();
             }
@@ -229,11 +216,8 @@ impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()> for State 
         _conn: &Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
-        println!("event is: {event:?}");
         if let zwlr_data_control_offer_v1::Event::Offer { mime_type } = event {
-            state.mime_types.clear();
-            let mime_types: Vec<String> = mime_type.lines().map(|line| line.to_string()).collect();
-            state.mime_types = mime_types;
+            state.mime_types.push(mime_type);
         }
     }
 }
