@@ -3,7 +3,7 @@ use std::{io::Read, os::fd::AsRawFd};
 use wayland_client::{
     event_created_child,
     protocol::{wl_registry, wl_seat},
-    Connection, Dispatch, Proxy,
+    Connection, Dispatch, EventQueue, Proxy,
 };
 
 use wayland_protocols_wlr::data_control::v1::client::{
@@ -11,71 +11,117 @@ use wayland_protocols_wlr::data_control::v1::client::{
     zwlr_data_control_source_v1,
 };
 
+use std::sync::{Arc, Mutex};
+
 use os_pipe::pipe;
 
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum WaylandCopyError {
+    #[error("Init Failed")]
+    InitFailed(String),
+    #[error("Error during queue")]
+    QueueError(String),
+    #[error("PipeError")]
+    PipeError,
+}
 // TODO: just support text now
 const TEXT: &str = "text/plain;charset=utf-8";
 
 fn main() {
-    let conn = Connection::connect_to_env().unwrap();
+    let stream = WaylandCopyStream::init().unwrap();
 
-    let mut event_queue = conn.new_event_queue();
-    let qhandle = event_queue.handle();
-
-    let display = conn.display();
-
-    display.get_registry(&qhandle, ());
-    let mut state = State {
-        seat: None,
-        seat_name: None,
-        data_manager: None,
-        data_device: None,
-        mime_types: Vec::new(),
-        pipereader: None,
-    };
-
-    event_queue.blocking_dispatch(&mut state).unwrap();
-
-    if !state.device_ready() {
-        eprintln!("Cannot get seat and data maanger");
-        return;
-    }
-
-    while state.seat_name.is_none() {
-        event_queue.roundtrip(&mut state).unwrap();
-    }
-
-    println!("get seat name: {}", state.seat_name.as_ref().unwrap());
-
-    state.set_data_device(&qhandle);
-
-    loop {
-        if let Err(e) = event_queue.roundtrip(&mut state) {
-            println!("error: {e}");
-            break;
-        };
-
-        if state.pipereader.is_some() {
-            event_queue.roundtrip(&mut state).unwrap();
-            let mut read = state.pipereader.as_ref().unwrap();
-            let mut context = String::new();
-            read.read_to_string(&mut context).unwrap();
-            println!("it is {}", context);
-            state.pipereader = None;
-        }
+    for context in stream.flatten().flatten() {
+        println!("{context}");
     }
 }
 
-struct State {
+struct WaylandCopyStream {
     seat: Option<wl_seat::WlSeat>,
     seat_name: Option<String>,
     data_manager: Option<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1>,
     data_device: Option<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1>,
     mime_types: Vec<String>,
     pipereader: Option<os_pipe::PipeReader>,
+    queue: Option<Arc<Mutex<EventQueue<Self>>>>,
 }
 
-impl State {
+impl Iterator for WaylandCopyStream {
+    type Item = Result<Option<String>, WaylandCopyError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.get_clipboard())
+    }
+}
+
+impl WaylandCopyStream {
+    pub fn init() -> Result<Self, WaylandCopyError> {
+        let conn = Connection::connect_to_env()
+            .map_err(|_| WaylandCopyError::InitFailed("Cannot connect to wayland".to_string()))?;
+
+        let mut event_queue = conn.new_event_queue();
+        let qhandle = event_queue.handle();
+
+        let display = conn.display();
+
+        display.get_registry(&qhandle, ());
+        let mut state = WaylandCopyStream {
+            seat: None,
+            seat_name: None,
+            data_manager: None,
+            data_device: None,
+            mime_types: Vec::new(),
+            pipereader: None,
+            queue: None,
+        };
+
+        event_queue
+            .blocking_dispatch(&mut state)
+            .map_err(|e| WaylandCopyError::InitFailed(format!("Inital dispatch failed:{e}")))?;
+
+        if !state.device_ready() {
+            return Err(WaylandCopyError::InitFailed(
+                "Cannot get seat and data manager".to_string(),
+            ));
+        }
+
+        while state.seat_name.is_none() {
+            event_queue.roundtrip(&mut state).map_err(|_| {
+                WaylandCopyError::InitFailed("Cannot roundtrip during init".to_string())
+            })?;
+        }
+
+        state.set_data_device(&qhandle);
+        state.queue = Some(Arc::new(Mutex::new(event_queue)));
+        Ok(state)
+    }
+
+    fn state_queue(&mut self) -> Result<(), WaylandCopyError> {
+        let queue = self.queue.clone().unwrap();
+        let mut queue = queue
+            .lock()
+            .map_err(|e| WaylandCopyError::QueueError(e.to_string()))?;
+        queue
+            .roundtrip(self)
+            .map_err(|e| WaylandCopyError::QueueError(e.to_string()))?;
+        Ok(())
+    }
+
+    fn get_clipboard(&mut self) -> Result<Option<String>, WaylandCopyError> {
+        self.state_queue()?;
+        if self.pipereader.is_some() {
+            self.state_queue()?;
+            let mut read = self.pipereader.as_ref().unwrap();
+            let mut context = String::new();
+            read.read_to_string(&mut context)
+                .map_err(|_| WaylandCopyError::PipeError)?;
+            self.pipereader = None;
+            Ok(Some(context))
+        } else {
+            Ok(None)
+        }
+    }
     fn device_ready(&self) -> bool {
         self.seat.is_some() && self.data_manager.is_some()
     }
@@ -95,7 +141,7 @@ impl State {
     }
 }
 
-impl Dispatch<wl_registry::WlRegistry, ()> for State {
+impl Dispatch<wl_registry::WlRegistry, ()> for WaylandCopyStream {
     fn event(
         state: &mut Self,
         registry: &wl_registry::WlRegistry,
@@ -128,7 +174,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
     }
 }
 
-impl Dispatch<wl_seat::WlSeat, ()> for State {
+impl Dispatch<wl_seat::WlSeat, ()> for WaylandCopyStream {
     fn event(
         state: &mut Self,
         _proxy: &wl_seat::WlSeat,
@@ -143,7 +189,7 @@ impl Dispatch<wl_seat::WlSeat, ()> for State {
     }
 }
 
-impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()> for State {
+impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()> for WaylandCopyStream {
     fn event(
         _state: &mut Self,
         _proxy: &zwlr_data_control_manager_v1::ZwlrDataControlManagerV1,
@@ -155,7 +201,7 @@ impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()> for St
     }
 }
 
-impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for State {
+impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for WaylandCopyStream {
     fn event(
         state: &mut Self,
         _proxy: &zwlr_data_control_device_v1::ZwlrDataControlDeviceV1,
@@ -183,18 +229,18 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for Stat
                 .as_ref()
                 .unwrap()
                 .set_selection(Some(&source));
-        } else if let zwlr_data_control_device_v1::Event::PrimarySelection { id } = event {
-            if let Some(offer) = id {
-                offer.destroy();
-            }
+        } else if let zwlr_data_control_device_v1::Event::PrimarySelection { id: Some(offer) } =
+            event
+        {
+            offer.destroy();
         }
     }
-    event_created_child!(State, zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, [
+    event_created_child!(WaylandCopyStream, zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, [
         zwlr_data_control_device_v1::EVT_DATA_OFFER_OPCODE => (zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ())
     ]);
 }
 
-impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()> for State {
+impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()> for WaylandCopyStream {
     fn event(
         _state: &mut Self,
         _proxy: &zwlr_data_control_source_v1::ZwlrDataControlSourceV1,
@@ -207,7 +253,7 @@ impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()> for Stat
     }
 }
 
-impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()> for State {
+impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()> for WaylandCopyStream {
     fn event(
         state: &mut Self,
         _proxy: &zwlr_data_control_offer_v1::ZwlrDataControlOfferV1,

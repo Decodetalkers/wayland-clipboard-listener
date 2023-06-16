@@ -343,6 +343,7 @@ name = "waylandcopy"
 version = "0.1.0"
 dependencies = [
  "os_pipe",
+ "thiserror",
  "wayland-client",
  "wayland-protocols",
  "wayland-protocols-wlr",
