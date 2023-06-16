@@ -110,10 +110,15 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                     .unwrap()
                     .set_selection(Some(&source));
             }
-            zwlr_data_control_device_v1::Event::PrimarySelection { id: Some(offer) } => {
-                offer.destroy();
+            zwlr_data_control_device_v1::Event::PrimarySelection { id } => {
+                if let Some(offer) = id {
+                    offer.destroy();
+                }
             }
-            zwlr_data_control_device_v1::Event::Selection { id: Some(offer) } => {
+            zwlr_data_control_device_v1::Event::Selection { id } => {
+                let Some(offer) = id else {
+                    return;
+                };
                 if let WlListenType::ListenOnCopy = state.listentype {
                     // TODO: how can I handle the mimetype?
                     let mimetype = if state.is_text() || state.mime_types.is_empty() {
@@ -127,7 +132,9 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                     state.pipereader = Some(read);
                 }
             }
-            _ => unimplemented!(),
+            _ => {
+                println!("unhandled event: {:?}", event);
+            }
         }
     }
     event_created_child!(WlClipboardListenerStream, zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, [

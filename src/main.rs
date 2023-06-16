@@ -1,5 +1,5 @@
-use wayland_clipboard_listener::WlListenType;
 use wayland_clipboard_listener::WlClipboardListenerStream;
+use wayland_clipboard_listener::WlListenType;
 
 fn main() {
     let stream = WlClipboardListenerStream::init(WlListenType::ListenOnHover).unwrap();
