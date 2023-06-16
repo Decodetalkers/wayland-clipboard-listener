@@ -42,8 +42,8 @@ pub enum WlClipboardListenerError {
 
 /// context
 /// here describe two types of context
-/// 1. text, just string
-/// 2. file , with [u8]
+/// 1. text, just [String]
+/// 2. file , with [Vec<u8>]
 #[derive(Debug)]
 pub enum ClipBoardListenContext {
     Text(String),
@@ -79,11 +79,14 @@ impl Iterator for WlClipboardListenerStream {
 }
 
 impl WlClipboardListenerStream {
-    /// ```
+    /// ``` rust, no_run
     /// use wayland_clipboard_listener::WlClipboardListenerStream;
     /// use wayland_clipboard_listener::WlListenType;
     ///
     /// let stream = WlClipboardListenerStream::init(WlListenType::ListenOnSelect).unwrap();
+    /// for context in stream.flatten() {
+    ///    println!("{context:?}");
+    /// }
     /// ```
     pub fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
         let conn = Connection::connect_to_env().map_err(|_| {
