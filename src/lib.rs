@@ -21,7 +21,7 @@ use constvar::TEXT;
 /// ListenOnCopy will get the full mimetype, but you should copy to enable the listen,
 #[derive(Debug)]
 pub enum WlListenType {
-    ListenOnHover,
+    ListenOnSelect,
     ListenOnCopy,
 }
 

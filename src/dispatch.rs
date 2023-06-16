@@ -91,7 +91,7 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
     ) {
         match event {
             zwlr_data_control_device_v1::Event::DataOffer { id } => {
-                if let WlListenType::ListenOnHover = state.listentype {
+                if let WlListenType::ListenOnSelect = state.listentype {
                     let (read, write) = pipe().unwrap();
                     id.receive(TEXT.to_string(), write.as_raw_fd());
                     drop(write);
