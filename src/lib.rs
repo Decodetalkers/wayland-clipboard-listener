@@ -44,8 +44,9 @@ impl Iterator for WlClipboardListenerStream {
 
 impl WlClipboardListenerStream {
     pub fn init() -> Result<Self, WlClipboardListenerError> {
-        let conn = Connection::connect_to_env()
-            .map_err(|_| WlClipboardListenerError::InitFailed("Cannot connect to wayland".to_string()))?;
+        let conn = Connection::connect_to_env().map_err(|_| {
+            WlClipboardListenerError::InitFailed("Cannot connect to wayland".to_string())
+        })?;
 
         let mut event_queue = conn.new_event_queue();
         let qhandle = event_queue.handle();
@@ -63,9 +64,9 @@ impl WlClipboardListenerStream {
             queue: None,
         };
 
-        event_queue
-            .blocking_dispatch(&mut state)
-            .map_err(|e| WlClipboardListenerError::InitFailed(format!("Inital dispatch failed: {e}")))?;
+        event_queue.blocking_dispatch(&mut state).map_err(|e| {
+            WlClipboardListenerError::InitFailed(format!("Inital dispatch failed: {e}"))
+        })?;
 
         if !state.device_ready() {
             return Err(WlClipboardListenerError::InitFailed(

@@ -64,7 +64,9 @@ impl Dispatch<wl_seat::WlSeat, ()> for WlClipboardListenerStream {
     }
 }
 
-impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()> for WlClipboardListenerStream {
+impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()>
+    for WlClipboardListenerStream
+{
     fn event(
         _state: &mut Self,
         _proxy: &zwlr_data_control_manager_v1::ZwlrDataControlManagerV1,
@@ -76,7 +78,9 @@ impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()> for Wl
     }
 }
 
-impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for WlClipboardListenerStream {
+impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
+    for WlClipboardListenerStream
+{
     fn event(
         state: &mut Self,
         _proxy: &zwlr_data_control_device_v1::ZwlrDataControlDeviceV1,
@@ -115,7 +119,9 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()> for WlCl
     ]);
 }
 
-impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()> for WlClipboardListenerStream {
+impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()>
+    for WlClipboardListenerStream
+{
     fn event(
         _state: &mut Self,
         _proxy: &zwlr_data_control_source_v1::ZwlrDataControlSourceV1,
@@ -128,7 +134,9 @@ impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()> for WlCl
     }
 }
 
-impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()> for WlClipboardListenerStream {
+impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()>
+    for WlClipboardListenerStream
+{
     fn event(
         state: &mut Self,
         _proxy: &zwlr_data_control_offer_v1::ZwlrDataControlOfferV1,
