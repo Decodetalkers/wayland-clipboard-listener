@@ -147,7 +147,7 @@ impl WlClipboardListenerStream {
                 let mime_types = self.mime_types.clone();
                 self.mime_types.clear();
                 // it is hover type, it will not receive the context
-                if let WlListenType::ListenOnCopy = self.listentype {
+                if let WlListenType::ListenOnSelect = self.listentype {
                     Ok(None)
                 } else {
                     Ok(Some(ClipBoardListenMessage {
