@@ -145,16 +145,16 @@ impl WlClipboardListenerStream {
         let source = manager.create_data_source(&qh, ());
         let device = self.data_device.as_ref().unwrap();
         source.offer(TEXT.to_string());
+        source.offer("text/plain".to_string());
+        source.offer("TEXT".to_string());
+        source.offer("STRING".to_string());
+        source.offer("UTF8_STRING".to_string());
         device.set_selection(Some(&source));
         self.copy_data = Some(data);
-        loop {
-            let rt = event_queue
-                .roundtrip(self)
-                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
-            if rt == 0 {
-                break;
-            }
-        }
+        event_queue
+            .blocking_dispatch(self)
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+        self.copy_data = None;
         Ok(())
     }
 

@@ -166,7 +166,6 @@ impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()>
                 let mut f = unsafe { File::from_raw_fd(fd.as_raw_fd()) };
                 f.write_all(&data.to_vec()).unwrap();
             }
-            state.copy_data = None;
         }
     }
 }
