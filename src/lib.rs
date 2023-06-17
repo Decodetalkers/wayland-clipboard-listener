@@ -131,7 +131,9 @@ impl WlClipboardListenerStream {
         Ok(state)
     }
 
-    fn get_clipboard(
+    /// get data from clipboard for once
+    /// it is also used in iter
+    pub fn get_clipboard(
         &mut self,
     ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
         // get queue, start blocking_dispatch for first loop
