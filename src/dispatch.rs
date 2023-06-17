@@ -95,6 +95,9 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
     ) {
         match event {
             zwlr_data_control_device_v1::Event::DataOffer { id } => {
+                if state.copy_data.is_some() {
+                    return;
+                }
                 if let WlListenType::ListenOnSelect = state.listentype {
                     let (read, write) = pipe().unwrap();
                     id.receive(TEXT.to_string(), write.as_raw_fd());
@@ -123,6 +126,10 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                 let Some(offer) = id else {
                     return;
                 };
+                // if is copying, not run this
+                if state.copy_data.is_some() {
+                    return;
+                }
                 if let WlListenType::ListenOnCopy = state.listentype {
                     // TODO: how can I handle the mimetype?
                     let mimetype = if state.is_text() || state.mime_types.is_empty() {
