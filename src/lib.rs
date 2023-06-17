@@ -188,9 +188,7 @@ impl WlClipboardListenerStream {
     fn set_data_device(&mut self, qh: &wayland_client::QueueHandle<Self>) {
         let seat = self.seat.as_ref().unwrap();
         let manager = self.data_manager.as_ref().unwrap();
-        let source = manager.create_data_source(qh, ());
         let device = manager.get_data_device(seat, qh, ());
-        device.set_selection(Some(&source));
 
         self.data_device = Some(device);
     }
