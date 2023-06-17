@@ -149,7 +149,7 @@ impl WlClipboardListenerStream {
             .blocking_dispatch(self)
             .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         event_queue
-            .roundtrip(self)
+            .blocking_dispatch(self)
             .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         Ok(())
     }
