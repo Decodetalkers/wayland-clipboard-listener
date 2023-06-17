@@ -68,6 +68,7 @@ pub struct WlClipboardListenerStream {
     mime_types: Vec<String>,
     pipereader: Option<os_pipe::PipeReader>,
     queue: Option<Arc<Mutex<EventQueue<Self>>>>,
+    copy_data: Option<Vec<u8>>,
 }
 
 impl Iterator for WlClipboardListenerStream {
@@ -108,6 +109,7 @@ impl WlClipboardListenerStream {
             mime_types: Vec::new(),
             pipereader: None,
             queue: None,
+            copy_data: None,
         };
 
         event_queue.blocking_dispatch(&mut state).map_err(|e| {
@@ -131,6 +133,23 @@ impl WlClipboardListenerStream {
         Ok(state)
     }
 
+    /// copy data to stream
+    /// pass [Vec<u8>] as data
+    /// now it can just copy text
+    pub fn copy_to_clipboard(&mut self, data: Vec<u8>) -> Result<(), WlClipboardListenerError> {
+        let eventqh = self.queue.clone().unwrap();
+        let mut event_queue = eventqh.lock().unwrap();
+        let qh = event_queue.handle();
+        let manager = self.data_manager.as_ref().unwrap();
+        let source = manager.create_data_source(&qh, ());
+        let device = self.data_device.as_ref().unwrap();
+        device.set_selection(Some(&source));
+        self.copy_data = Some(data);
+        event_queue
+            .blocking_dispatch(self)
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+        Ok(())
+    }
     /// get data from clipboard for once
     /// it is also used in iter
     pub fn get_clipboard(

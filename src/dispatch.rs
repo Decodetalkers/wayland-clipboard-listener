@@ -1,6 +1,10 @@
 use super::WlClipboardListenerStream;
 
-use std::os::fd::AsRawFd;
+use std::io::Write;
+use std::{
+    fs::File,
+    os::fd::{AsRawFd, FromRawFd},
+};
 
 use wayland_client::{
     event_created_child,
@@ -116,7 +120,6 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                 }
             }
             zwlr_data_control_device_v1::Event::Selection { id } => {
-                println!("ssss");
                 let Some(offer) = id else {
                     return;
                 };
@@ -147,14 +150,22 @@ impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()>
     for WlClipboardListenerStream
 {
     fn event(
-        _state: &mut Self,
+        state: &mut Self,
         _proxy: &zwlr_data_control_source_v1::ZwlrDataControlSourceV1,
-        _event: <zwlr_data_control_source_v1::ZwlrDataControlSourceV1 as Proxy>::Event,
+        event: <zwlr_data_control_source_v1::ZwlrDataControlSourceV1 as Proxy>::Event,
         _data: &(),
         _conn: &Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
-        //println!("source: {event:?}");
+        if let zwlr_data_control_source_v1::Event::Send { fd, mime_type } = event {
+            // TODO: when need other type?
+            if mime_type == TEXT {
+                let mut f = unsafe { File::from_raw_fd(fd.as_raw_fd()) };
+                let data = state.copy_data.as_ref().unwrap();
+                f.write_all(&data.to_vec()).unwrap();
+            }
+            state.copy_data = None;
+        }
     }
 }
 
