@@ -148,8 +148,12 @@ impl WlClipboardListenerStream {
         event_queue
             .blocking_dispatch(self)
             .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+        event_queue
+            .roundtrip(self)
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         Ok(())
     }
+
     /// get data from clipboard for once
     /// it is also used in iter
     pub fn get_clipboard(
