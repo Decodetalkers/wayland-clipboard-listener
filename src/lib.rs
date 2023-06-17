@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use thiserror::Error;
 
-use constvar::TEXT;
+use constvar::{IMAGE, TEXT};
 
 /// listentype
 /// if ListenOnHover, it wll be useful for translation apps, but in dispatch, we cannot know the
@@ -194,6 +194,8 @@ impl WlClipboardListenerStream {
     }
 
     fn is_text(&self) -> bool {
-        !self.mime_types.is_empty() && self.mime_types.contains(&TEXT.to_string())
+        !self.mime_types.is_empty()
+            && self.mime_types.contains(&TEXT.to_string())
+            && !self.mime_types.contains(&IMAGE.to_string())
     }
 }

@@ -116,6 +116,7 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                 }
             }
             zwlr_data_control_device_v1::Event::Selection { id } => {
+                println!("ssss");
                 let Some(offer) = id else {
                     return;
                 };
@@ -169,6 +170,7 @@ impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()>
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
         if let zwlr_data_control_offer_v1::Event::Offer { mime_type } = event {
+            println!("{mime_type}");
             state.mime_types.push(mime_type);
         }
     }
