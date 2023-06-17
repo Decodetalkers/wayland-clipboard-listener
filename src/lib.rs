@@ -136,6 +136,7 @@ impl WlClipboardListenerStream {
     /// copy data to stream
     /// pass [Vec<u8>] as data
     /// now it can just copy text
+    /// FIXME: I canot know why clipboard is not active
     pub fn copy_to_clipboard(&mut self, data: Vec<u8>) -> Result<(), WlClipboardListenerError> {
         let eventqh = self.queue.clone().unwrap();
         let mut event_queue = eventqh.lock().unwrap();
@@ -143,14 +144,17 @@ impl WlClipboardListenerStream {
         let manager = self.data_manager.as_ref().unwrap();
         let source = manager.create_data_source(&qh, ());
         let device = self.data_device.as_ref().unwrap();
+        source.offer(TEXT.to_string());
         device.set_selection(Some(&source));
         self.copy_data = Some(data);
-        event_queue
-            .blocking_dispatch(self)
-            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
-        event_queue
-            .blocking_dispatch(self)
-            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+        loop {
+            let rt = event_queue
+                .roundtrip(self)
+                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+            if rt == 0 {
+                break;
+            }
+        }
         Ok(())
     }
 

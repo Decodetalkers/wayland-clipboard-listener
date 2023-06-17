@@ -12,7 +12,7 @@ fn main() -> Result<(), WlClipboardListenerError> {
     };
     let context = match context {
         wayland_clipboard_listener::ClipBoardListenContext::Text(text) => text.as_bytes().to_vec(),
-        wayland_clipboard_listener::ClipBoardListenContext::File(bites) => bites.clone(),
+        wayland_clipboard_listener::ClipBoardListenContext::File(bites) => bites,
     };
     stdout().write_all(&context).unwrap();
     Ok(())
