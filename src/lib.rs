@@ -116,12 +116,11 @@ impl WlClipboardCopyStream {
     /// let args = std::env::args();
     /// if args.len() != 2 {
     ///     println!("You need to pass a string to it");
-    ///     return Ok(());
+    /// } else {
+    ///     let context: &str = &args.last().unwrap();
+    ///     let mut stream = WlClipboardCopyStream::init().unwrap();
+    ///     stream.copy_to_clipboard(context.as_bytes().to_vec()).unwrap();
     /// }
-    /// let context: &str = &args.last().unwrap();
-    /// let mut stream = WlClipboardCopyStream::init()?;
-    /// stream.copy_to_clipboard(context.as_bytes().to_vec())?;
-    /// Ok(())
     ///```
     pub fn copy_to_clipboard(&mut self, data: Vec<u8>) -> Result<(), WlClipboardListenerError> {
         self.inner.copy_to_clipboard(data)
