@@ -31,7 +31,7 @@ thiserror = "1.0.40"
 
 [[bin]]
 name = "marine_copy"
-path = "bin/marin_copy.rs"
+path = "bin/marine_copy.rs"
 
 [[bin]]
 name = "marine_paste"
