@@ -220,6 +220,8 @@ impl WlClipboardListenerStream {
                 .blocking_dispatch(self)
                 .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         }
+        self.copy_data = None;
+        self.copy_cancelled = false;
         Ok(())
     }
 
