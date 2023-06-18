@@ -1,6 +1,4 @@
-use wayland_clipboard_listener::{
-    WlClipboardListenerError, WlClipboardListenerStream, WlListenType,
-};
+use wayland_clipboard_listener::{WlClipboardCopyStream, WlClipboardListenerError};
 fn main() -> Result<(), WlClipboardListenerError> {
     let args = std::env::args();
     if args.len() != 2 {
@@ -8,7 +6,7 @@ fn main() -> Result<(), WlClipboardListenerError> {
         return Ok(());
     }
     let context: &str = &args.last().unwrap();
-    let mut stream = WlClipboardListenerStream::init(WlListenType::ListenOnCopy)?;
+    let mut stream = WlClipboardCopyStream::init()?;
     stream.copy_to_clipboard(context.as_bytes().to_vec())?;
     Ok(())
 }

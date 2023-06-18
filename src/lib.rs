@@ -56,6 +56,78 @@ pub struct ClipBoardListenMessage {
     pub context: ClipBoardListenContext,
 }
 
+/// Paste stream
+/// it is used to handle paste event
+pub struct WlClipboardPasteStream {
+    inner: WlClipboardListenerStream,
+}
+
+impl WlClipboardPasteStream {
+    /// init a paste steam, you can use WlListenType::ListenOnSelect to watch the select event
+    /// It can just listen on text
+    /// use ListenOnCopy will receive the mimetype, can copy many types
+    pub fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
+        Ok(Self {
+            inner: WlClipboardListenerStream::init(listentype)?,
+        })
+    }
+
+    /// return a steam, to iter
+    /// ```rust, no_run
+    /// use wayland_clipboard_listener::WlClipboardPasteStream;
+    /// use wayland_clipboard_listener::WlListenType;
+    ///
+    /// let mut stream = WlClipboardPasteStream::init(WlListenType::ListenOnCopy).unwrap();
+    ///
+    /// for context in stream.paste_stream().flatten() {
+    ///     println!("{context:?}")
+    /// }
+    /// ```
+    pub fn paste_stream(&mut self) -> &mut WlClipboardListenerStream {
+        &mut self.inner
+    }
+
+    ///  just get the clipboard once
+    pub fn get_clipboard(
+        &mut self,
+    ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
+        self.inner.get_clipboard()
+    }
+}
+
+/// copy stream,
+/// it can used to make a wl-copy
+pub struct WlClipboardCopyStream {
+    inner: WlClipboardListenerStream,
+}
+
+impl WlClipboardCopyStream {
+    /// init a copy steam, you can use it to copy some files
+    pub fn init() -> Result<Self, WlClipboardListenerError> {
+        Ok(Self {
+            inner: WlClipboardListenerStream::init(WlListenType::ListenOnCopy)?,
+        })
+    }
+
+    /// it will run a never end loop, to handle the paste event, like what wl-copy do
+    /// you maybe need to connect it to linux signal, when next time another copy program start,
+    /// kill it self
+    /// ``` rust, no_run
+    /// use wayland_clipboard_listener::{WlClipboardCopyStream, WlClipboardListenerError};
+    /// let args = std::env::args();
+    /// if args.len() != 2 {
+    ///     println!("You need to pass a string to it");
+    ///     return Ok(());
+    /// }
+    /// let context: &str = &args.last().unwrap();
+    /// let mut stream = WlClipboardCopyStream::init()?;
+    /// stream.copy_to_clipboard(context.as_bytes().to_vec())?;
+    /// Ok(())
+    ///```
+    pub fn copy_to_clipboard(&mut self, data: Vec<u8>) -> Result<(), WlClipboardListenerError> {
+        self.inner.copy_to_clipboard(data)
+    }
+}
 /// Stream, provide a iter to listen to clipboard
 /// Note, the iter will loop very fast, you would better to use thread sleep
 /// or iter you self
@@ -80,16 +152,9 @@ impl Iterator for WlClipboardListenerStream {
 }
 
 impl WlClipboardListenerStream {
-    /// ``` rust, no_run
-    /// use wayland_clipboard_listener::WlClipboardListenerStream;
-    /// use wayland_clipboard_listener::WlListenType;
-    ///
-    /// let stream = WlClipboardListenerStream::init(WlListenType::ListenOnSelect).unwrap();
-    /// for context in stream.flatten() {
-    ///    println!("{context:?}");
-    /// }
-    /// ```
-    pub fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
+    /// private init
+    /// to init a stream
+    fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
         let conn = Connection::connect_to_env().map_err(|_| {
             WlClipboardListenerError::InitFailed("Cannot connect to wayland".to_string())
         })?;
@@ -137,7 +202,7 @@ impl WlClipboardListenerStream {
     /// pass [Vec<u8>] as data
     /// now it can just copy text
     /// It will always live in the background, so you need to handle it yourself
-    pub fn copy_to_clipboard(&mut self, data: Vec<u8>) -> Result<(), WlClipboardListenerError> {
+    fn copy_to_clipboard(&mut self, data: Vec<u8>) -> Result<(), WlClipboardListenerError> {
         let eventqh = self.queue.clone().unwrap();
         let mut event_queue = eventqh.lock().unwrap();
         let qh = event_queue.handle();
@@ -159,7 +224,7 @@ impl WlClipboardListenerStream {
 
     /// get data from clipboard for once
     /// it is also used in iter
-    pub fn get_clipboard(
+    fn get_clipboard(
         &mut self,
     ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
         // get queue, start blocking_dispatch for first loop

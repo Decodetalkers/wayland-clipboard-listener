@@ -1,11 +1,11 @@
 use std::io::{stdout, Write};
 
 use wayland_clipboard_listener::{
-    ClipBoardListenMessage, WlClipboardListenerError, WlClipboardListenerStream, WlListenType,
+    ClipBoardListenMessage, WlClipboardListenerError, WlClipboardPasteStream, WlListenType,
 };
 
 fn main() -> Result<(), WlClipboardListenerError> {
-    let mut stream = WlClipboardListenerStream::init(WlListenType::ListenOnCopy)?;
+    let mut stream = WlClipboardPasteStream::init(WlListenType::ListenOnCopy)?;
     let Some(ClipBoardListenMessage { context, .. }) = stream.get_clipboard()? else {
         eprintln!("Warning, no context in clipboard");
         return Ok(());
