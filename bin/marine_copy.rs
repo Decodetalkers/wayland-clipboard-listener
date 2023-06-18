@@ -7,6 +7,6 @@ fn main() -> Result<(), WlClipboardListenerError> {
     }
     let context: &str = &args.last().unwrap();
     let mut stream = WlClipboardCopyStream::init()?;
-    stream.copy_to_clipboard(context.as_bytes().to_vec())?;
+    stream.copy_to_clipboard(context.as_bytes().to_vec(), false)?;
     Ok(())
 }

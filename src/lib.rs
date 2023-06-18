@@ -83,7 +83,7 @@
 //!     }
 //!     let context: &str = &args.last().unwrap();
 //!     let mut stream = WlClipboardCopyStream::init()?;
-//!     stream.copy_to_clipboard(context.as_bytes().to_vec())?;
+//!     stream.copy_to_clipboard(context.as_bytes().to_vec(), false)?;
 //!     Ok(())
 //! }
 
@@ -200,6 +200,9 @@ impl WlClipboardCopyStream {
 
     /// it will run a never end loop, to handle the paste event, like what wl-copy do
     /// it will live until next copy event happened
+    /// you need to pass data and if use useprimary to it,
+    /// if is useprimary, you can use the middle button of mouse to paste
+    /// Take [primary-selection](https://patchwork.freedesktop.org/patch/257267/) as reference
     /// ``` rust, no_run
     /// use wayland_clipboard_listener::{WlClipboardCopyStream, WlClipboardListenerError};
     /// let args = std::env::args();
@@ -208,11 +211,15 @@ impl WlClipboardCopyStream {
     /// } else {
     ///     let context: &str = &args.last().unwrap();
     ///     let mut stream = WlClipboardCopyStream::init().unwrap();
-    ///     stream.copy_to_clipboard(context.as_bytes().to_vec()).unwrap();
+    ///     stream.copy_to_clipboard(context.as_bytes().to_vec(), false).unwrap();
     /// }
     ///```
-    pub fn copy_to_clipboard(&mut self, data: Vec<u8>) -> Result<(), WlClipboardListenerError> {
-        self.inner.copy_to_clipboard(data)
+    pub fn copy_to_clipboard(
+        &mut self,
+        data: Vec<u8>,
+        useprimary: bool,
+    ) -> Result<(), WlClipboardListenerError> {
+        self.inner.copy_to_clipboard(data, useprimary)
     }
 }
 /// Stream, provide a iter to listen to clipboard
@@ -291,7 +298,11 @@ impl WlClipboardListenerStream {
     /// pass [Vec<u8>] as data
     /// now it can just copy text
     /// It will always live in the background, so you need to handle it yourself
-    fn copy_to_clipboard(&mut self, data: Vec<u8>) -> Result<(), WlClipboardListenerError> {
+    fn copy_to_clipboard(
+        &mut self,
+        data: Vec<u8>,
+        useprimary: bool,
+    ) -> Result<(), WlClipboardListenerError> {
         let eventqh = self.queue.clone().unwrap();
         let mut event_queue = eventqh.lock().unwrap();
         let qh = event_queue.handle();
@@ -302,7 +313,12 @@ impl WlClipboardListenerStream {
         source.offer("text/plain".to_string());
         source.offer("TEXT".to_string());
         source.offer("UTF8_STRING".to_string());
-        device.set_selection(Some(&source));
+        if useprimary {
+            device.set_primary_selection(Some(&source));
+        } else {
+            device.set_selection(Some(&source));
+        }
+
         self.copy_data = Some(data);
         while !self.copy_cancelled {
             event_queue
