@@ -110,8 +110,7 @@ impl WlClipboardCopyStream {
     }
 
     /// it will run a never end loop, to handle the paste event, like what wl-copy do
-    /// you maybe need to connect it to linux signal, when next time another copy program start,
-    /// kill it self
+    /// it will live until next copy event happened
     /// ``` rust, no_run
     /// use wayland_clipboard_listener::{WlClipboardCopyStream, WlClipboardListenerError};
     /// let args = std::env::args();
@@ -141,6 +140,7 @@ pub struct WlClipboardListenerStream {
     pipereader: Option<os_pipe::PipeReader>,
     queue: Option<Arc<Mutex<EventQueue<Self>>>>,
     copy_data: Option<Vec<u8>>,
+    copy_cancelled: bool,
 }
 
 impl Iterator for WlClipboardListenerStream {
@@ -175,6 +175,7 @@ impl WlClipboardListenerStream {
             pipereader: None,
             queue: None,
             copy_data: None,
+            copy_cancelled: false,
         };
 
         event_queue.blocking_dispatch(&mut state).map_err(|e| {
@@ -215,11 +216,12 @@ impl WlClipboardListenerStream {
         source.offer("UTF8_STRING".to_string());
         device.set_selection(Some(&source));
         self.copy_data = Some(data);
-        loop {
+        while !self.copy_cancelled {
             event_queue
                 .blocking_dispatch(self)
                 .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         }
+        Ok(())
     }
 
     /// get data from clipboard for once

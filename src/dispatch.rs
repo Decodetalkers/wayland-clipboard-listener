@@ -164,14 +164,20 @@ impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()>
         _conn: &Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
-        if let zwlr_data_control_source_v1::Event::Send { fd, mime_type } = event {
-            let Some(data) = state.copy_data.as_ref() else {
-                return;
-            };
-            // TODO: when need other type?
-            if mime_type == TEXT {
-                let mut f = unsafe { File::from_raw_fd(fd.as_raw_fd()) };
-                f.write_all(&data.to_vec()).unwrap();
+        match event {
+            zwlr_data_control_source_v1::Event::Send { fd, mime_type } => {
+                let Some(data) = state.copy_data.as_ref() else {
+                    return;
+                };
+                // TODO: when need other type?
+                if mime_type == TEXT {
+                    let mut f = unsafe { File::from_raw_fd(fd.as_raw_fd()) };
+                    f.write_all(&data.to_vec()).unwrap();
+                }
+            }
+            zwlr_data_control_source_v1::Event::Cancelled => state.copy_cancelled = true,
+            _ => {
+                eprintln!("unhandled event: {event:?}");
             }
         }
     }
