@@ -1,6 +1,6 @@
 mod constvar;
 mod dispatch;
-use std::{future::poll_fn, io::Read};
+use std::io::Read;
 
 use wayland_client::{protocol::wl_seat, Connection, EventQueue};
 
@@ -93,13 +93,6 @@ impl WlClipboardPasteStream {
     ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
         self.inner.get_clipboard()
     }
-
-    /// get clipboard with async
-    pub async fn get_clipboard_async(
-        &mut self,
-    ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
-        self.inner.get_clipboard_async().await
-    }
 }
 
 /// copy stream,
@@ -131,14 +124,6 @@ impl WlClipboardCopyStream {
     ///```
     pub fn copy_to_clipboard(&mut self, data: Vec<u8>) -> Result<(), WlClipboardListenerError> {
         self.inner.copy_to_clipboard(data)
-    }
-
-    /// copy daemon, with async
-    pub async fn copy_to_clipboard_async(
-        &mut self,
-        data: Vec<u8>,
-    ) -> Result<(), WlClipboardListenerError> {
-        self.inner.copy_to_clipboard_async(data).await
     }
 }
 /// Stream, provide a iter to listen to clipboard
@@ -240,36 +225,6 @@ impl WlClipboardListenerStream {
         Ok(())
     }
 
-    /// copy data to stream
-    /// pass [Vec<u8>] as data
-    /// now it can just copy text
-    /// It will always live in the background, so you need to handle it yourself
-    async fn copy_to_clipboard_async(
-        &mut self,
-        data: Vec<u8>,
-    ) -> Result<(), WlClipboardListenerError> {
-        let eventqh = self.queue.clone().unwrap();
-        let mut event_queue = eventqh.lock().unwrap();
-        let qh = event_queue.handle();
-        let manager = self.data_manager.as_ref().unwrap();
-        let source = manager.create_data_source(&qh, ());
-        let device = self.data_device.as_ref().unwrap();
-        source.offer(TEXT.to_string());
-        source.offer("text/plain".to_string());
-        source.offer("TEXT".to_string());
-        source.offer("UTF8_STRING".to_string());
-        device.set_selection(Some(&source));
-        self.copy_data = Some(data);
-        while !self.copy_cancelled {
-            poll_fn(|cx| event_queue.poll_dispatch_pending(cx, self))
-                .await
-                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
-        }
-        self.copy_data = None;
-        self.copy_cancelled = false;
-        Ok(())
-    }
-
     /// get data from clipboard for once
     /// it is also used in iter
     fn get_clipboard(
@@ -282,58 +237,6 @@ impl WlClipboardListenerStream {
             .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         queue
             .blocking_dispatch(self)
-            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
-        if self.pipereader.is_some() {
-            // roundtrip to init pipereader
-            queue
-                .roundtrip(self)
-                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
-            let mut read = self.pipereader.as_ref().unwrap();
-            if self.is_text() {
-                let mut context = String::new();
-                read.read_to_string(&mut context)
-                    .map_err(|_| WlClipboardListenerError::PipeError)?;
-                self.pipereader = None;
-                let mime_types = self.mime_types.clone();
-                self.mime_types.clear();
-                Ok(Some(ClipBoardListenMessage {
-                    mime_types,
-                    context: ClipBoardListenContext::Text(context),
-                }))
-            } else {
-                let mut context = vec![];
-                read.read_to_end(&mut context)
-                    .map_err(|_| WlClipboardListenerError::PipeError)?;
-                self.pipereader = None;
-                let mime_types = self.mime_types.clone();
-                self.mime_types.clear();
-                // it is hover type, it will not receive the context
-                if let WlListenType::ListenOnSelect = self.listentype {
-                    Ok(None)
-                } else {
-                    Ok(Some(ClipBoardListenMessage {
-                        mime_types,
-                        context: ClipBoardListenContext::File(context),
-                    }))
-                }
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// get data from clipboard for once in async
-    /// it is also used in iter
-    async fn get_clipboard_async(
-        &mut self,
-    ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
-        // get queue, start blocking_dispatch for first loop
-        let queue = self.queue.clone().unwrap();
-        let mut queue = queue
-            .lock()
-            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
-        poll_fn(|cx| queue.poll_dispatch_pending(cx, self))
-            .await
             .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         if self.pipereader.is_some() {
             // roundtrip to init pipereader
