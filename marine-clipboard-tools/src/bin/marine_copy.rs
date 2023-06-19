@@ -24,6 +24,13 @@ fn main() -> Result<(), WlClipboardListenerError> {
         return Ok(());
     }
 
+    let mimetypes = vec![
+        "text/plain",
+        "TEXT",
+        "UTF8_STRING",
+        "text/plain;charset=utf-8",
+        "image/png",
+    ];
     let mut stream = WlClipboardCopyStream::init()?;
 
     if let Ok(ForkResult::Child) = unsafe { fork() } {
@@ -33,7 +40,7 @@ fn main() -> Result<(), WlClipboardListenerError> {
             let _ = dup2(dev_null, STDIN_FILENO);
             let _ = dup2(dev_null, STDOUT_FILENO);
             let _ = close(dev_null);
-            stream.copy_to_clipboard(context, false)?;
+            stream.copy_to_clipboard(context, mimetypes, false)?;
         }
     }
 

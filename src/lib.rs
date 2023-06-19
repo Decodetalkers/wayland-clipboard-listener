@@ -83,7 +83,7 @@
 //!     }
 //!     let context: &str = &args.last().unwrap();
 //!     let mut stream = WlClipboardCopyStream::init()?;
-//!     stream.copy_to_clipboard(context.as_bytes().to_vec(), false)?;
+//!     stream.copy_to_clipboard(context.as_bytes().to_vec(), vec!["TEXT"] ,false)?;
 //!     Ok(())
 //! }
 
@@ -211,15 +211,16 @@ impl WlClipboardCopyStream {
     /// } else {
     ///     let context: &str = &args.last().unwrap();
     ///     let mut stream = WlClipboardCopyStream::init().unwrap();
-    ///     stream.copy_to_clipboard(context.as_bytes().to_vec(), false).unwrap();
+    ///     stream.copy_to_clipboard(context.as_bytes().to_vec(), vec!["STRING"], false).unwrap();
     /// }
     ///```
     pub fn copy_to_clipboard(
         &mut self,
         data: Vec<u8>,
+        mimetypes: Vec<&str>,
         useprimary: bool,
     ) -> Result<(), WlClipboardListenerError> {
-        self.inner.copy_to_clipboard(data, useprimary)
+        self.inner.copy_to_clipboard(data, mimetypes, useprimary)
     }
 }
 /// Stream, provide a iter to listen to clipboard
@@ -301,6 +302,7 @@ impl WlClipboardListenerStream {
     fn copy_to_clipboard(
         &mut self,
         data: Vec<u8>,
+        mimetypes: Vec<&str>,
         useprimary: bool,
     ) -> Result<(), WlClipboardListenerError> {
         let eventqh = self.queue.clone().unwrap();
@@ -309,12 +311,15 @@ impl WlClipboardListenerStream {
         let manager = self.data_manager.as_ref().unwrap();
         let source = manager.create_data_source(&qh, ());
         let device = self.data_device.as_ref().unwrap();
-        source.offer(TEXT.to_string());
-        source.offer("text/plain".to_string());
-        source.offer("TEXT".to_string());
-        source.offer("UTF8_STRING".to_string());
-        // TODO: it such kind is good?
-        source.offer(IMAGE.to_string());
+        //source.offer(TEXT.to_string());
+        //source.offer("text/plain".to_string());
+        //source.offer("TEXT".to_string());
+        //source.offer("UTF8_STRING".to_string());
+        //// TODO: it such kind is good?
+        //source.offer(IMAGE.to_string());
+        for mimetype in mimetypes {
+            source.offer(mimetype.to_string());
+        }
         if useprimary {
             device.set_primary_selection(Some(&source));
         } else {

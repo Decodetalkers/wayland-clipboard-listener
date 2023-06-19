@@ -18,7 +18,10 @@ use wayland_protocols_wlr::data_control::v1::client::{
     zwlr_data_control_source_v1,
 };
 
-use crate::{constvar::TEXT, WlListenType};
+use crate::{
+    constvar::{IMAGE, TEXT},
+    WlListenType,
+};
 
 impl Dispatch<wl_registry::WlRegistry, ()> for WlClipboardListenerStream {
     fn event(
@@ -169,8 +172,8 @@ impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()>
                 let Some(data) = state.copy_data.as_ref() else {
                     return;
                 };
-                // TODO: when need other type?
-                if mime_type == TEXT {
+                // FIXME: how to handle the mime_type?
+                if mime_type == TEXT || mime_type == IMAGE {
                     let mut f = unsafe { File::from_raw_fd(fd.as_raw_fd()) };
                     f.write_all(&data.to_vec()).unwrap();
                 }
