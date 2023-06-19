@@ -8,6 +8,7 @@ description = "impl wlr-data-control-unstable-v1, listen for clipboard"
 homepage = "https://github.com/Decodetalkers/wayland-clipboard-listener"
 authors = ["Decodertalkers <aakari@tutanota.com>"]
 keywords = ["wayland"]
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

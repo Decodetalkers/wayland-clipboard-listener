@@ -98,3 +98,12 @@ fn main() -> Result<(), WlClipboardListenerError> {
     stream.copy_to_clipboard(context.as_bytes().to_vec())?;
     Ok(())
 }
+```
+
+Thanks to wl-clipboard-rs, and smithay.
+
+You can take a look to the repo following:
+
+* [wl-clipboard-rs](https://github.com/YaLTeR/wl-clipboard-rs)
+
+* [smithay](https://github.com/Smithay/smithay)
