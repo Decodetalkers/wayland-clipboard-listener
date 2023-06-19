@@ -313,15 +313,11 @@ impl WlClipboardListenerStream {
         let manager = self.data_manager.as_ref().unwrap();
         let source = manager.create_data_source(&qh, ());
         let device = self.data_device.as_ref().unwrap();
-        //source.offer(TEXT.to_string());
-        //source.offer("text/plain".to_string());
-        //source.offer("TEXT".to_string());
-        //source.offer("UTF8_STRING".to_string());
-        //// TODO: it such kind is good?
-        //source.offer(IMAGE.to_string());
+
         for mimetype in mimetypes {
             source.offer(mimetype.to_string());
         }
+
         if useprimary {
             device.set_primary_selection(Some(&source));
         } else {
