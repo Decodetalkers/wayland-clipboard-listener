@@ -26,8 +26,9 @@ wayland-client = { version = "0.30.1", features = ["calloop"] }
 os_pipe = "1.1.4"
 thiserror = "1.0.40"
 
-#[dev-dependencies]
-#clap = "4.3.3"
+# Dev dependencies
+nix = "0.24.2"
+libc = "0.2.146"
 
 [[bin]]
 name = "marine_copy"
