@@ -87,6 +87,8 @@
 //!     Ok(())
 //! }
 
+#![allow(clippy::needless_doctest_main)]
+
 mod constvar;
 mod dispatch;
 use std::io::Read;
