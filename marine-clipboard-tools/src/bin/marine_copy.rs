@@ -5,13 +5,25 @@ use nix::{
 };
 use wayland_clipboard_listener::{WlClipboardCopyStream, WlClipboardListenerError};
 
+use std::io::{stdin, Read};
+
 fn main() -> Result<(), WlClipboardListenerError> {
     let args = std::env::args();
-    if args.len() != 2 {
-        println!("You need to pass a string to it");
+    let context = {
+        let len = args.len();
+        if len != 2 {
+            let mut context = vec![];
+            stdin().lock().read_to_end(&mut context).unwrap();
+            context
+        } else {
+            args.last().unwrap().as_bytes().to_vec()
+        }
+    };
+    if context.is_empty() {
+        eprintln!("You need to pass something in");
         return Ok(());
     }
-    let context: &str = &args.last().unwrap();
+
     let mut stream = WlClipboardCopyStream::init()?;
 
     if let Ok(ForkResult::Child) = unsafe { fork() } {
@@ -21,7 +33,7 @@ fn main() -> Result<(), WlClipboardListenerError> {
             let _ = dup2(dev_null, STDIN_FILENO);
             let _ = dup2(dev_null, STDOUT_FILENO);
             let _ = close(dev_null);
-            stream.copy_to_clipboard(context.as_bytes().to_vec(), false)?;
+            stream.copy_to_clipboard(context, false)?;
         }
     }
 

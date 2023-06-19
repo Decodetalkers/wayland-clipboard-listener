@@ -313,6 +313,8 @@ impl WlClipboardListenerStream {
         source.offer("text/plain".to_string());
         source.offer("TEXT".to_string());
         source.offer("UTF8_STRING".to_string());
+        // TODO: it such kind is good?
+        source.offer(IMAGE.to_string());
         if useprimary {
             device.set_primary_selection(Some(&source));
         } else {
