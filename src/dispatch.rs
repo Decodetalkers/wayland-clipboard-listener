@@ -3,7 +3,7 @@ use super::WlClipboardListenerStream;
 use std::io::Write;
 use std::{
     fs::File,
-    os::fd::{AsRawFd, FromRawFd},
+    os::fd::AsRawFd,
 };
 
 use wayland_client::{
@@ -174,7 +174,7 @@ impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()>
                 };
                 // FIXME: how to handle the mime_type?
                 if mime_type == TEXT || mime_type == IMAGE {
-                    let mut f = unsafe { File::from_raw_fd(fd.as_raw_fd()) };
+                    let mut f = File::from(fd);
                     f.write_all(&data.to_vec()).unwrap();
                 }
             }
