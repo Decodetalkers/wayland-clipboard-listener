@@ -239,7 +239,7 @@ dependencies = [
 
 [[package]]
 name = "wayland-clipboard-listener"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "os_pipe",
  "thiserror",

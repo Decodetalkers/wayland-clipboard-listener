@@ -1,6 +1,6 @@
 [package]
 name = "wayland-clipboard-listener"
-version = "0.2.5"
+version = "0.2.6"
 documentation = "https://docs.rs/wayland-clipboard-listener/"
 edition = "2021"
 license = "GPL-3.0"
