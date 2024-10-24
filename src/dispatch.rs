@@ -1,10 +1,8 @@
 use super::WlClipboardListenerStream;
 
+use std::fs::File;
 use std::io::Write;
-use std::{
-    fs::File,
-    os::fd::AsRawFd,
-};
+use std::os::fd::AsFd;
 
 use wayland_client::{
     event_created_child,
@@ -103,7 +101,7 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                 }
                 if let WlListenType::ListenOnSelect = state.listentype {
                     let (read, write) = pipe().unwrap();
-                    id.receive(TEXT.to_string(), write.as_raw_fd());
+                    id.receive(TEXT.to_string(), write.as_fd());
                     drop(write);
                     state.pipereader = Some(read);
                 }
@@ -141,7 +139,7 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                         state.mime_types[0].clone()
                     };
                     let (read, write) = pipe().unwrap();
-                    offer.receive(mimetype, write.as_raw_fd());
+                    offer.receive(mimetype, write.as_fd());
                     drop(write);
                     state.pipereader = Some(read);
                 }
