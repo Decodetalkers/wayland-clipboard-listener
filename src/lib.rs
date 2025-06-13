@@ -65,6 +65,11 @@
 //!
 //! fn main() {
 //!     let mut stream = WlClipboardPasteStream::init(WlListenType::ListenOnCopy).unwrap();
+//!     // Optional: set MIME type priority
+//!     // stream.set_priority(vec![
+//!     //     "image/jpeg".into(),
+//!     //     "text/plain;charset=utf-8".into(),
+//!     // ]);
 //!     for context in stream.paste_stream().flatten().flatten() {
 //!         println!("{context:?}");
 //!     }
@@ -184,6 +189,11 @@ impl WlClipboardPasteStream {
     ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
         self.inner.get_clipboard()
     }
+
+    ///  set MIME type priority
+    pub fn set_priority(&mut self, val: Vec<String>) {
+        self.inner.set_priority = Some(val);
+    }
 }
 
 /// copy stream,
@@ -235,6 +245,7 @@ pub struct WlClipboardListenerStream {
     data_manager: Option<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1>,
     data_device: Option<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1>,
     mime_types: Vec<String>,
+    set_priority: Option<Vec<String>>,
     pipereader: Option<os_pipe::PipeReader>,
     queue: Option<Arc<Mutex<EventQueue<Self>>>>,
     copy_data: Option<Vec<u8>>,
@@ -270,6 +281,7 @@ impl WlClipboardListenerStream {
             data_manager: None,
             data_device: None,
             mime_types: Vec::new(),
+            set_priority: None,
             pipereader: None,
             queue: None,
             copy_data: None,

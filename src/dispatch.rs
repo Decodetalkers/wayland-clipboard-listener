@@ -131,12 +131,23 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                 if state.copy_data.is_some() {
                     return;
                 }
-                if let WlListenType::ListenOnCopy = state.listentype {
-                    // TODO: how can I handle the mimetype?
-                    let mimetype = if state.is_text() || state.mime_types.is_empty() {
+                // TODO: how can I handle the mimetype?
+                let select_mimetype = |state: &WlClipboardListenerStream| {
+                    if state.is_text() || state.mime_types.is_empty() {
                         TEXT.to_string()
                     } else {
                         state.mime_types[0].clone()
+                    }
+                };
+                if let WlListenType::ListenOnCopy = state.listentype {
+                    // if priority is set
+                    let mimetype = if let Some(val) = &state.set_priority {
+                        val.iter()
+                            .find(|i| state.mime_types.contains(i))
+                            .cloned()
+                            .unwrap_or_else(|| select_mimetype(&state))
+                    } else {
+                        select_mimetype(&state)
                     };
                     let (read, write) = pipe().unwrap();
                     offer.receive(mimetype, write.as_fd());
