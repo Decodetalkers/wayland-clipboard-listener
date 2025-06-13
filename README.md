@@ -8,7 +8,7 @@ it impl `wlr-data-control-unstable-v1`, you can see the protocol under
 
 you can use it on sway or kde
 
-it is GPL-v3, if you use the code, you need to privide your code, you should not fuck to use the code to listen on people's clipboard and upload it to you company or government, you must fuck to opensource your code.
+it is GPL-v3, if you use the code, you need to provide your code, you should not fuck to use the code to listen on people's clipboard and upload it to you company or government, you must fuck to opensource your code.
 
 ## General Induction
 impl wlr-data-control-unstable-v1, handle the clipboard on sway, hyperland or kde animpl the
@@ -35,7 +35,7 @@ and copied, here you can pass a file description to receive, and mimetype of TEX
 this time you do not know any mimetype of the data
 * 2. it will enter the event of zwlrDataControlOfferV1, there the mimetype be send, but before
 , you ignore the mimetype
-* 3. it enter the selection, follow the document of the protocol, you need to destory the offer,
+* 3. it enter the selection, follow the document of the protocol, you need to destroy the offer,
 if there is one,
 * 4. the main loop is end, then you need to run roundtrip, again, for the pipeline finished,
 then you will receive the text. Note, if in this routine, you need to check the mimetype in the
@@ -60,11 +60,11 @@ Copy event involves ZwlrDataControlDeviceV1 and ZwlrDataControlSourceV1.
 
 * 1. if you want to send the data, you need to create a new ZwlrDataControlSourceV1, use the
 create_data_source function of zwlr_data_control_manager_v1, create a new one, and set the
-mimetype to it , use `offer` request. You can set muti times,
+mimetype to it , use `offer` request. You can set multi times,
 * 2. start a never end loop of blocking_dispatch, but it is not never end loop, it should break
 when receive cancelled event of ZwlrDataControlSourceV1, this means another data is copied, the
 progress is not needed anymore
-   * 2.1 in blocking_dispatchs at the begining, you will receive some signals of send, with
+   * 2.1 in blocking_dispatches at the beginning, you will receive some signals of send, with
    mimetype and a file description, write the data to the fd, then copy will finished, data
    will in clipboard
    * 2.2 when received cancelled, exit the progress
