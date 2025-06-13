@@ -1,7 +1,6 @@
-use libc::{STDIN_FILENO, STDOUT_FILENO};
 use nix::{
     fcntl::OFlag,
-    unistd::{close, dup2, fork, ForkResult},
+    unistd::{close, dup2_stdin, dup2_stdout, fork, ForkResult},
 };
 use wayland_clipboard_listener::{WlClipboardCopyStream, WlClipboardListenerError};
 
@@ -37,8 +36,8 @@ fn main() -> Result<(), WlClipboardListenerError> {
         if let Ok(dev_null) =
             nix::fcntl::open("/dev/null", OFlag::O_RDWR, nix::sys::stat::Mode::empty())
         {
-            let _ = dup2(dev_null, STDIN_FILENO);
-            let _ = dup2(dev_null, STDOUT_FILENO);
+            let _ = dup2_stdin(&dev_null);
+            let _ = dup2_stdout(&dev_null);
             let _ = close(dev_null);
             stream.copy_to_clipboard(context, mimetypes, false)?;
         }

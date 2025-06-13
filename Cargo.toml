@@ -13,7 +13,11 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
+resolver = "3"
 members = [".", "marine-clipboard-tools"]
+
+[workspace.dependencies]
+wayland-clipboard-listener = { version = "0.3.0", path = "./" }
 
 [dependencies]
 wayland-protocols = { version = "0.32.8", default-features = false, features = [
