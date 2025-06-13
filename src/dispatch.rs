@@ -145,9 +145,9 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                         val.iter()
                             .find(|i| state.mime_types.contains(i))
                             .cloned()
-                            .unwrap_or_else(|| select_mimetype(&state))
+                            .unwrap_or_else(|| select_mimetype(state))
                     } else {
-                        select_mimetype(&state)
+                        select_mimetype(state)
                     };
                     let (read, write) = pipe().unwrap();
                     offer.receive(mimetype, write.as_fd());

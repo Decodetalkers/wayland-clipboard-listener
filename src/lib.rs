@@ -16,18 +16,18 @@
 //!
 //! #### Road 1
 //!
-//! * 1. first, the event enter to DataOffer event of zwlrDataControlOfferV1, it will send a
-//! zwlrDataControlOfferV1 object, this will include the data message of clipboard, if you send
-//! this time, you will not know the mimetype. In this time, the data includes the text selected
-//! and copied, here you can pass a file description to receive, and mimetype of TEXT, because at
-//! this time you do not know any mimetype of the data
-//! * 2. it will enter the event of zwlrDataControlOfferV1, there the mimetype be send, but before
-//! , you ignore the mimetype
-//! * 3. it enter the selection, follow the document of the protocol, you need to destory the offer,
-//! if there is one,
-//! * 4. the main loop is end, then you need to run roundtrip, again, for the pipeline finished,
-//! then you will receive the text. Note, if in this routine, you need to check the mimetype in the
-//! end, because the data in pipeline maybe not text
+//! * 1. First, the event enter to DataOffer event of zwlrDataControlOfferV1, it will send a
+//!      zwlrDataControlOfferV1 object, this will include the data message of clipboard, if you send
+//!      this time, you will not know the mimetype. In this time, the data includes the text selected
+//!      and copied, here you can pass a file description to receive, and mimetype of TEXT, because at
+//!      this time you do not know any mimetype of the data
+//! * 2. It will enter the event of zwlrDataControlOfferV1, there the mimetype be send, but before
+//!      , you ignore the mimetype
+//! * 3. it enter the selection, follow the document of the protocol, you need to destroy the offer,
+//!      if there is one,
+//! * 4. The main loop is end, then you need to run roundtrip, again, for the pipeline finished,
+//!      then you will receive the text. Note, if in this routine, you need to check the mimetype in the
+//!      end, because the data in pipeline maybe not text
 //!
 //! ### Road 2
 //! it is similar with Road 1, but send receive request when receive selection event, this time you
@@ -47,15 +47,15 @@
 //! Copy event involves ZwlrDataControlDeviceV1 and ZwlrDataControlSourceV1.
 //!
 //! * 1. if you want to send the data, you need to create a new ZwlrDataControlSourceV1, use the
-//! create_data_source function of zwlr_data_control_manager_v1, create a new one, and set the
-//! mimetype to it , use `offer` request. You can set muti times,
+//!      create_data_source function of zwlr_data_control_manager_v1, create a new one, and set the
+//!      mimetype to it , use `offer` request. You can set multi times,
 //! * 2. start a never end loop of blocking_dispatch, but it is not never end loop, it should break
-//! when receive cancelled event of ZwlrDataControlSourceV1, this means another data is copied, the
-//! progress is not needed anymore
-//!    * 2.1 in blocking_dispatchs at the begining, you will receive some signals of send, with
-//!    mimetype and a file description, write the data to the fd, then copy will finished, data
-//!    will in clipboard
-//!    * 2.2 when received cancelled, exit the progress
+//!      when receive cancelled event of ZwlrDataControlSourceV1, this means another data is copied, the
+//!      progress is not needed anymore
+//!   * 2.1. In blocking_dispatches at the beginning, you will receive some signals of send, with
+//!     mimetype and a file description, write the data to the fd, then copy will finished, data
+//!     will be in clipboard
+//!   * 2.2. when received cancelled, exit the progress
 //!
 //! A simple example to create a clipboard listener is following:
 //!
@@ -111,7 +111,7 @@ use thiserror::Error;
 use constvar::{IMAGE, TEXT};
 
 /// listentype
-/// if ListenOnHover, it wll be useful for translation apps, but in dispatch, we cannot know the
+/// if ListenOnHover, it will be useful for translation apps, but in dispatch, we cannot know the
 /// mime_types, it can only handle text
 ///
 /// ListenOnCopy will get the full mimetype, but you should copy to enable the listen,
@@ -289,7 +289,7 @@ impl WlClipboardListenerStream {
         };
 
         event_queue.blocking_dispatch(&mut state).map_err(|e| {
-            WlClipboardListenerError::InitFailed(format!("Inital dispatch failed: {e}"))
+            WlClipboardListenerError::InitFailed(format!("Initial dispatch failed: {e}"))
         })?;
 
         if !state.device_ready() {
