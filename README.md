@@ -78,6 +78,11 @@ use wayland_clipboard_listener::WlListenType;
 fn main() {
     let mut stream = WlClipboardPasteStream::init(WlListenType::ListenOnCopy).unwrap();
     for context in stream.paste_stream().flatten().flatten() {
+    //  Note: MIME type priority is ignored when WlListenType is ListenOnSelect
+    //  stream.set_priority(vec![
+    //      "image/jpeg".into(),
+    //      "text/plain;charset=utf-8".into(),
+    //  ]);
         println!("{context:?}");
     }
 }
