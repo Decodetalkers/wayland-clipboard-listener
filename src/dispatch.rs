@@ -101,6 +101,7 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                 }
                 if let WlListenType::ListenOnSelect = state.listentype {
                     let (read, write) = pipe().unwrap();
+                    state.current_type = Some(TEXT.to_string());
                     id.receive(TEXT.to_string(), write.as_fd());
                     drop(write);
                     state.pipereader = Some(read);
@@ -149,6 +150,7 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                     } else {
                         select_mimetype(state)
                     };
+                    state.current_type = Some(mimetype.clone());
                     let (read, write) = pipe().unwrap();
                     offer.receive(mimetype, write.as_fd());
                     drop(write);

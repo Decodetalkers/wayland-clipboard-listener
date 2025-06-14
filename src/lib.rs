@@ -65,7 +65,7 @@
 //!
 //! fn main() {
 //!     let mut stream = WlClipboardPasteStream::init(WlListenType::ListenOnCopy).unwrap();
-//!     // Optional: set MIME type priority
+//!     // Note: MIME type priority is ignored when WlListenType is ListenOnSelect
 //!     // stream.set_priority(vec![
 //!     //     "image/jpeg".into(),
 //!     //     "text/plain;charset=utf-8".into(),
@@ -141,9 +141,9 @@ pub enum WlClipboardListenerError {
 /// 1. text, just [String]
 /// 2. file , with [`Vec<u8>`]
 #[derive(Debug)]
-pub enum ClipBoardListenContext {
-    Text(String),
-    File(Vec<u8>),
+pub struct ClipBoardListenContext {
+    pub mime_type: String,
+    pub context: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -190,7 +190,7 @@ impl WlClipboardPasteStream {
         self.inner.get_clipboard()
     }
 
-    ///  set MIME type priority
+    /// Set MIME type priority (only applies when using ListenOnCopy)
     pub fn set_priority(&mut self, val: Vec<String>) {
         self.inner.set_priority = Some(val);
     }
@@ -247,6 +247,7 @@ pub struct WlClipboardListenerStream {
     mime_types: Vec<String>,
     set_priority: Option<Vec<String>>,
     pipereader: Option<os_pipe::PipeReader>,
+    current_type: Option<String>,
     queue: Option<Arc<Mutex<EventQueue<Self>>>>,
     copy_data: Option<Vec<u8>>,
     copy_cancelled: bool,
@@ -283,6 +284,7 @@ impl WlClipboardListenerStream {
             mime_types: Vec::new(),
             set_priority: None,
             pipereader: None,
+            current_type: None,
             queue: None,
             copy_data: None,
             copy_cancelled: false,
@@ -366,34 +368,17 @@ impl WlClipboardListenerStream {
                 .roundtrip(self)
                 .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
             let mut read = self.pipereader.as_ref().unwrap();
-            if self.is_text() {
-                let mut context = String::new();
-                read.read_to_string(&mut context)
-                    .map_err(|_| WlClipboardListenerError::PipeError)?;
-                self.pipereader = None;
-                let mime_types = self.mime_types.clone();
-                self.mime_types.clear();
-                Ok(Some(ClipBoardListenMessage {
-                    mime_types,
-                    context: ClipBoardListenContext::Text(context),
-                }))
-            } else {
-                let mut context = vec![];
-                read.read_to_end(&mut context)
-                    .map_err(|_| WlClipboardListenerError::PipeError)?;
-                self.pipereader = None;
-                let mime_types = self.mime_types.clone();
-                self.mime_types.clear();
-                // it is hover type, it will not receive the context
-                if let WlListenType::ListenOnSelect = self.listentype {
-                    Ok(None)
-                } else {
-                    Ok(Some(ClipBoardListenMessage {
-                        mime_types,
-                        context: ClipBoardListenContext::File(context),
-                    }))
-                }
-            }
+            let mut context = vec![];
+            read.read_to_end(&mut context)
+                .map_err(|_| WlClipboardListenerError::PipeError)?;
+            self.pipereader = None;
+            let mime_types = self.mime_types.clone();
+            self.mime_types.clear();
+            let mime_type = self.current_type.clone().unwrap();
+            Ok(Some(ClipBoardListenMessage {
+                mime_types,
+                context: ClipBoardListenContext { mime_type, context },
+            }))
         } else {
             Ok(None)
         }

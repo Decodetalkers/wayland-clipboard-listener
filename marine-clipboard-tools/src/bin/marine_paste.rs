@@ -10,10 +10,7 @@ fn main() -> Result<(), WlClipboardListenerError> {
         eprintln!("Warning, no context in clipboard");
         return Ok(());
     };
-    let context = match context {
-        wayland_clipboard_listener::ClipBoardListenContext::Text(text) => text.as_bytes().to_vec(),
-        wayland_clipboard_listener::ClipBoardListenContext::File(bites) => bites,
-    };
+    let context = context.context;
     stdout().write_all(&context).unwrap();
     Ok(())
 }
