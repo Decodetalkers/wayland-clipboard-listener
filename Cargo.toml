@@ -32,3 +32,4 @@ wayland-protocols-wlr = { version = "0.3.8", default-features = false, features 
 ] }
 os_pipe = "1.2.2"
 thiserror = "2.0.12"
+log = "0.4.27"

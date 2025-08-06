@@ -158,7 +158,7 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                 }
             }
             _ => {
-                println!("unhandled event: {:?}", event);
+                log::info!("unhandled event: {event:?}");
             }
         }
     }
