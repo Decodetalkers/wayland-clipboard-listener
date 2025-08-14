@@ -70,7 +70,7 @@
 //!     //     "image/jpeg".into(),
 //!     //     "text/plain;charset=utf-8".into(),
 //!     // ]);
-//!     for context in stream.paste_stream().flatten().flatten() {
+//!     for context in stream.paste_stream().flatten() {
 //!         println!("{context:?}");
 //!     }
 //! }
@@ -182,12 +182,15 @@ impl WlClipboardPasteStream {
     pub fn paste_stream(&mut self) -> &mut WlClipboardListenerStream {
         &mut self.inner
     }
-
     ///  just get the clipboard once
-    pub fn get_clipboard(
+    pub fn get_clipboard(&mut self) -> Result<ClipBoardListenMessage, WlClipboardListenerError> {
+        self.inner.get_clipboard_sync()
+    }
+    ///  just get the clipboard once
+    pub fn try_get_clipboard(
         &mut self,
     ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
-        self.inner.get_clipboard()
+        self.inner.try_get_clipboard()
     }
 
     /// Set MIME type priority (only applies when using ListenOnCopy)
@@ -254,10 +257,10 @@ pub struct WlClipboardListenerStream {
 }
 
 impl Iterator for WlClipboardListenerStream {
-    type Item = Result<Option<ClipBoardListenMessage>, WlClipboardListenerError>;
+    type Item = Result<ClipBoardListenMessage, WlClipboardListenerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.get_clipboard())
+        Some(self.get_clipboard_sync())
     }
 }
 
@@ -351,7 +354,39 @@ impl WlClipboardListenerStream {
 
     /// get data from clipboard for once
     /// it is also used in iter
-    fn get_clipboard(
+    fn get_clipboard_sync(&mut self) -> Result<ClipBoardListenMessage, WlClipboardListenerError> {
+        // get queue, start blocking_dispatch for first loop
+        let queue = self.queue.clone().unwrap();
+        let mut queue = queue
+            .lock()
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+        while self.pipereader.is_none() {
+            queue
+                .blocking_dispatch(self)
+                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+        }
+
+        // roundtrip to init pipereader
+        queue
+            .roundtrip(self)
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+        let mut read = self.pipereader.as_ref().unwrap();
+        let mut context = vec![];
+        read.read_to_end(&mut context)
+            .map_err(|_| WlClipboardListenerError::PipeError)?;
+        self.pipereader = None;
+        let mime_types = self.mime_types.clone();
+        self.mime_types.clear();
+        let mime_type = self.current_type.clone().unwrap();
+        Ok(ClipBoardListenMessage {
+            mime_types,
+            context: ClipBoardListenContext { mime_type, context },
+        })
+    }
+
+    /// get data from clipboard for once
+    /// it is also used in iter
+    fn try_get_clipboard(
         &mut self,
     ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
         // get queue, start blocking_dispatch for first loop
