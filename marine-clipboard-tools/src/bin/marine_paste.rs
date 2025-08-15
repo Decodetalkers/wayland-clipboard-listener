@@ -6,7 +6,7 @@ use wayland_clipboard_listener::{
 
 fn main() -> Result<(), WlClipboardListenerError> {
     let mut stream = WlClipboardPasteStream::init(WlListenType::ListenOnCopy)?;
-    let Some(ClipBoardListenMessage { context, .. }) = stream.get_clipboard()? else {
+    let Some(ClipBoardListenMessage { context, .. }) = stream.try_get_clipboard()? else {
         eprintln!("Warning, no context in clipboard");
         return Ok(());
     };
