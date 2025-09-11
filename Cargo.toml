@@ -1,6 +1,6 @@
 [package]
 name = "wayland-clipboard-listener"
-version = "0.4.0"
+version = "0.5.0"
 documentation = "https://docs.rs/wayland-clipboard-listener/"
 edition = "2021"
 license = "GPL-3.0"
@@ -17,7 +17,7 @@ resolver = "3"
 members = [".", "marine-clipboard-tools"]
 
 [workspace.dependencies]
-wayland-clipboard-listener = { version = "0.4.0", path = "./" }
+wayland-clipboard-listener = { version = "0.5.0", path = "./" }
 
 [dependencies]
 wayland-protocols = { version = "0.32.8", default-features = false, features = [
