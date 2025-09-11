@@ -98,7 +98,7 @@ mod constvar;
 mod dispatch;
 use std::io::Read;
 
-use wayland_client::{protocol::wl_seat, Connection, EventQueue};
+use wayland_client::{protocol::wl_seat, Connection, DispatchError, EventQueue};
 
 use wayland_protocols_wlr::data_control::v1::client::{
     zwlr_data_control_device_v1, zwlr_data_control_manager_v1,
@@ -132,6 +132,8 @@ pub enum WlClipboardListenerError {
     InitFailed(String),
     #[error("Error during queue")]
     QueueError(String),
+    #[error("DispatchError")]
+    DispatchError(#[from] DispatchError),
     #[error("PipeError")]
     PipeError,
 }
@@ -260,7 +262,11 @@ impl Iterator for WlClipboardListenerStream {
     type Item = Result<ClipBoardListenMessage, WlClipboardListenerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.get_clipboard_sync())
+        let data = self.get_clipboard_sync();
+        if let Err(WlClipboardListenerError::DispatchError(err)) = data.as_ref() {
+            panic!("error with wayland side: {err}");
+        }
+        Some(data)
     }
 }
 
@@ -361,15 +367,11 @@ impl WlClipboardListenerStream {
             .lock()
             .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         while self.pipereader.is_none() {
-            queue
-                .blocking_dispatch(self)
-                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+            queue.blocking_dispatch(self)?;
         }
 
         // roundtrip to init pipereader
-        queue
-            .roundtrip(self)
-            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+        queue.roundtrip(self)?;
         let mut read = self.pipereader.as_ref().unwrap();
         let mut context = vec![];
         read.read_to_end(&mut context)
@@ -394,14 +396,10 @@ impl WlClipboardListenerStream {
         let mut queue = queue
             .lock()
             .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
-        queue
-            .blocking_dispatch(self)
-            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+        queue.blocking_dispatch(self)?;
         if self.pipereader.is_some() {
             // roundtrip to init pipereader
-            queue
-                .roundtrip(self)
-                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+            queue.roundtrip(self)?;
             let mut read = self.pipereader.as_ref().unwrap();
             let mut context = vec![];
             read.read_to_end(&mut context)
