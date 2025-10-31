@@ -1,6 +1,10 @@
 //! ## General Induction
-//! impl wlr-data-control-unstable-v1, handle the clipboard on sway, hyperland or kde animpl the
-//! protocol.
+//! By default, this library uses the `ext-data-control-v1` protocol. This is the standard protocol
+//! supported by modern compositors.
+//!
+//! For legacy support, you can enable the `wlr-data-control` feature to use the older
+//! `wlr-data-control-unstable-v1` protocol. This handles the clipboard on sway, hyperland or kde
+//! that implement the protocol.
 //! You can view the protocol in [wlr-data-control-unstable-v1](https://wayland.app/protocols/wlr-data-control-unstable-v1). Here we simply explain it.
 //!
 //! This protocol involves there register: WlSeat, ZwlrDataControlManagerV1,
@@ -77,6 +81,22 @@
 //!
 //! ```
 //!
+//! For using the legacy wlr protocol (with the `wlr-data-control` feature):
+//! ```rust, no_run
+//! # #[cfg(feature = "wlr-data-control")]
+//! # {
+//! use wayland_clipboard_listener::WlClipboardPasteStreamWlr;
+//! use wayland_clipboard_listener::WlListenType;
+//!
+//! fn main() {
+//!     let mut stream = WlClipboardPasteStreamWlr::init(WlListenType::ListenOnCopy).unwrap();
+//!     for context in stream.paste_stream().flatten() {
+//!         println!("{context:?}");
+//!     }
+//! }
+//! # }
+//! ```
+//!
 //! A simple example to create a wl-copy is following:
 //! ``` rust, no_run
 //! use wayland_clipboard_listener::{WlClipboardCopyStream, WlClipboardListenerError};
@@ -96,10 +116,19 @@
 
 mod constvar;
 mod dispatch;
+
+#[cfg(feature = "wlr-data-control")]
+mod dispatch_wlr;
+
 use std::io::Read;
 
 use wayland_client::{protocol::wl_seat, Connection, DispatchError, EventQueue};
 
+use wayland_protocols::ext::data_control::v1::client::{
+    ext_data_control_device_v1, ext_data_control_manager_v1,
+};
+
+#[cfg(feature = "wlr-data-control")]
 use wayland_protocols_wlr::data_control::v1::client::{
     zwlr_data_control_device_v1, zwlr_data_control_manager_v1,
 };
@@ -247,8 +276,8 @@ pub struct WlClipboardListenerStream {
     listentype: WlListenType,
     seat: Option<wl_seat::WlSeat>,
     seat_name: Option<String>,
-    data_manager: Option<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1>,
-    data_device: Option<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1>,
+    data_manager: Option<ext_data_control_manager_v1::ExtDataControlManagerV1>,
+    data_device: Option<ext_data_control_device_v1::ExtDataControlDeviceV1>,
     mime_types: Vec<String>,
     set_priority: Option<Vec<String>>,
     pipereader: Option<os_pipe::PipeReader>,
@@ -285,6 +314,295 @@ impl WlClipboardListenerStream {
 
         display.get_registry(&qhandle, ());
         let mut state = WlClipboardListenerStream {
+            listentype,
+            seat: None,
+            seat_name: None,
+            data_manager: None,
+            data_device: None,
+            mime_types: Vec::new(),
+            set_priority: None,
+            pipereader: None,
+            current_type: None,
+            queue: None,
+            copy_data: None,
+            copy_cancelled: false,
+        };
+
+        event_queue.blocking_dispatch(&mut state).map_err(|e| {
+            WlClipboardListenerError::InitFailed(format!("Initial dispatch failed: {e}"))
+        })?;
+
+        if !state.device_ready() {
+            return Err(WlClipboardListenerError::InitFailed(
+                "Cannot get seat and data manager".to_string(),
+            ));
+        }
+
+        while state.seat_name.is_none() {
+            event_queue.roundtrip(&mut state).map_err(|_| {
+                WlClipboardListenerError::InitFailed("Cannot roundtrip during init".to_string())
+            })?;
+        }
+
+        state.set_data_device(&qhandle);
+        state.queue = Some(Arc::new(Mutex::new(event_queue)));
+        Ok(state)
+    }
+
+    /// copy data to stream
+    /// pass [Vec<u8>] as data
+    /// now it can just copy text
+    /// It will always live in the background, so you need to handle it yourself
+    fn copy_to_clipboard(
+        &mut self,
+        data: Vec<u8>,
+        mimetypes: Vec<&str>,
+        useprimary: bool,
+    ) -> Result<(), WlClipboardListenerError> {
+        let eventqh = self.queue.clone().unwrap();
+        let mut event_queue = eventqh.lock().unwrap();
+        let qh = event_queue.handle();
+        let manager = self.data_manager.as_ref().unwrap();
+        let source = manager.create_data_source(&qh, ());
+        let device = self.data_device.as_ref().unwrap();
+
+        for mimetype in mimetypes {
+            source.offer(mimetype.to_string());
+        }
+
+        if useprimary {
+            device.set_primary_selection(Some(&source));
+        } else {
+            device.set_selection(Some(&source));
+        }
+
+        self.copy_data = Some(data);
+        while !self.copy_cancelled {
+            event_queue
+                .blocking_dispatch(self)
+                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+        }
+        self.copy_data = None;
+        self.copy_cancelled = false;
+        Ok(())
+    }
+
+    /// get data from clipboard for once
+    /// it is also used in iter
+    fn get_clipboard_sync(&mut self) -> Result<ClipBoardListenMessage, WlClipboardListenerError> {
+        // get queue, start blocking_dispatch for first loop
+        let queue = self.queue.clone().unwrap();
+        let mut queue = queue
+            .lock()
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+        while self.pipereader.is_none() {
+            queue.blocking_dispatch(self)?;
+        }
+
+        // roundtrip to init pipereader
+        queue.roundtrip(self)?;
+        let mut read = self.pipereader.as_ref().unwrap();
+        let mut context = vec![];
+        read.read_to_end(&mut context)
+            .map_err(|_| WlClipboardListenerError::PipeError)?;
+        self.pipereader = None;
+        let mime_types = self.mime_types.clone();
+        self.mime_types.clear();
+        let mime_type = self.current_type.clone().unwrap();
+        Ok(ClipBoardListenMessage {
+            mime_types,
+            context: ClipBoardListenContext { mime_type, context },
+        })
+    }
+
+    /// get data from clipboard for once
+    /// it is also used in iter
+    fn try_get_clipboard(
+        &mut self,
+    ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
+        // get queue, start blocking_dispatch for first loop
+        let queue = self.queue.clone().unwrap();
+        let mut queue = queue
+            .lock()
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
+        queue.blocking_dispatch(self)?;
+        if self.pipereader.is_some() {
+            // roundtrip to init pipereader
+            queue.roundtrip(self)?;
+            let mut read = self.pipereader.as_ref().unwrap();
+            let mut context = vec![];
+            read.read_to_end(&mut context)
+                .map_err(|_| WlClipboardListenerError::PipeError)?;
+            self.pipereader = None;
+            let mime_types = self.mime_types.clone();
+            self.mime_types.clear();
+            let mime_type = self.current_type.clone().unwrap();
+            Ok(Some(ClipBoardListenMessage {
+                mime_types,
+                context: ClipBoardListenContext { mime_type, context },
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn device_ready(&self) -> bool {
+        self.seat.is_some() && self.data_manager.is_some()
+    }
+
+    fn set_data_device(&mut self, qh: &wayland_client::QueueHandle<Self>) {
+        let seat = self.seat.as_ref().unwrap();
+        let manager = self.data_manager.as_ref().unwrap();
+        let device = manager.get_data_device(seat, qh, ());
+
+        self.data_device = Some(device);
+    }
+
+    fn is_text(&self) -> bool {
+        !self.mime_types.is_empty()
+            && self.mime_types.contains(&TEXT.to_string())
+            && !self.mime_types.contains(&IMAGE.to_string())
+    }
+}
+
+// Wlr protocol support (legacy)
+#[cfg(feature = "wlr-data-control")]
+pub struct WlClipboardPasteStreamWlr {
+    inner: WlClipboardListenerStreamWlr,
+}
+
+#[cfg(feature = "wlr-data-control")]
+impl WlClipboardPasteStreamWlr {
+    /// init a paste steam, you can use WlListenType::ListenOnSelect to watch the select event
+    /// It can just listen on text
+    /// use ListenOnCopy will receive the mimetype, can copy many types
+    pub fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
+        Ok(Self {
+            inner: WlClipboardListenerStreamWlr::init(listentype)?,
+        })
+    }
+
+    /// return a steam, to iter
+    /// ```rust, no_run
+    /// use wayland_clipboard_listener::WlClipboardPasteStreamWlr;
+    /// use wayland_clipboard_listener::WlListenType;
+    ///
+    /// let mut stream = WlClipboardPasteStreamWlr::init(WlListenType::ListenOnCopy).unwrap();
+    ///
+    /// for context in stream.paste_stream().flatten() {
+    ///     println!("{context:?}")
+    /// }
+    /// ```
+    pub fn paste_stream(&mut self) -> &mut WlClipboardListenerStreamWlr {
+        &mut self.inner
+    }
+    ///  just get the clipboard once
+    pub fn get_clipboard(&mut self) -> Result<ClipBoardListenMessage, WlClipboardListenerError> {
+        self.inner.get_clipboard_sync()
+    }
+    ///  just get the clipboard once
+    pub fn try_get_clipboard(
+        &mut self,
+    ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
+        self.inner.try_get_clipboard()
+    }
+
+    /// Set MIME type priority (only applies when using ListenOnCopy)
+    pub fn set_priority(&mut self, val: Vec<String>) {
+        self.inner.set_priority = Some(val);
+    }
+}
+
+/// copy stream,
+/// it can used to make a wl-copy
+#[cfg(feature = "wlr-data-control")]
+pub struct WlClipboardCopyStreamWlr {
+    inner: WlClipboardListenerStreamWlr,
+}
+
+#[cfg(feature = "wlr-data-control")]
+impl WlClipboardCopyStreamWlr {
+    /// init a copy steam, you can use it to copy some files
+    pub fn init() -> Result<Self, WlClipboardListenerError> {
+        Ok(Self {
+            inner: WlClipboardListenerStreamWlr::init(WlListenType::ListenOnCopy)?,
+        })
+    }
+
+    /// it will run a never end loop, to handle the paste event, like what wl-copy do
+    /// it will live until next copy event happened
+    /// you need to pass data and if use useprimary to it,
+    /// if is useprimary, you can use the middle button of mouse to paste
+    /// Take [primary-selection](https://patchwork.freedesktop.org/patch/257267/) as reference
+    /// ``` rust, no_run
+    /// use wayland_clipboard_listener::{WlClipboardCopyStreamWlr, WlClipboardListenerError};
+    /// let args = std::env::args();
+    /// if args.len() != 2 {
+    ///     println!("You need to pass a string to it");
+    /// } else {
+    ///     let context: &str = &args.last().unwrap();
+    ///     let mut stream = WlClipboardCopyStreamWlr::init().unwrap();
+    ///     stream.copy_to_clipboard(context.as_bytes().to_vec(), vec!["STRING"], false).unwrap();
+    /// }
+    ///```
+    pub fn copy_to_clipboard(
+        &mut self,
+        data: Vec<u8>,
+        mimetypes: Vec<&str>,
+        useprimary: bool,
+    ) -> Result<(), WlClipboardListenerError> {
+        self.inner.copy_to_clipboard(data, mimetypes, useprimary)
+    }
+}
+
+/// Stream, provide a iter to listen to clipboard
+/// Note, the iter will loop very fast, you would better to use thread sleep
+/// or iter you self
+#[cfg(feature = "wlr-data-control")]
+pub struct WlClipboardListenerStreamWlr {
+    listentype: WlListenType,
+    seat: Option<wl_seat::WlSeat>,
+    seat_name: Option<String>,
+    data_manager: Option<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1>,
+    data_device: Option<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1>,
+    mime_types: Vec<String>,
+    set_priority: Option<Vec<String>>,
+    pipereader: Option<os_pipe::PipeReader>,
+    current_type: Option<String>,
+    queue: Option<Arc<Mutex<EventQueue<Self>>>>,
+    copy_data: Option<Vec<u8>>,
+    copy_cancelled: bool,
+}
+
+#[cfg(feature = "wlr-data-control")]
+impl Iterator for WlClipboardListenerStreamWlr {
+    type Item = Result<ClipBoardListenMessage, WlClipboardListenerError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let data = self.get_clipboard_sync();
+        if let Err(WlClipboardListenerError::DispatchError(err)) = data.as_ref() {
+            panic!("error with wayland side: {err}");
+        }
+        Some(data)
+    }
+}
+
+#[cfg(feature = "wlr-data-control")]
+impl WlClipboardListenerStreamWlr {
+    /// private init
+    /// to init a stream
+    fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
+        let conn = Connection::connect_to_env().map_err(|_| {
+            WlClipboardListenerError::InitFailed("Cannot connect to wayland".to_string())
+        })?;
+
+        let mut event_queue = conn.new_event_queue();
+        let qhandle = event_queue.handle();
+
+        let display = conn.display();
+
+        display.get_registry(&qhandle, ());
+        let mut state = WlClipboardListenerStreamWlr {
             listentype,
             seat: None,
             seat_name: None,

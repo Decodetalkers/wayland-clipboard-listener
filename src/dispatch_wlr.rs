@@ -1,4 +1,4 @@
-use super::WlClipboardListenerStream;
+use super::WlClipboardListenerStreamWlr;
 
 use std::fs::File;
 use std::io::Write;
@@ -11,9 +11,9 @@ use wayland_client::{
 };
 
 use os_pipe::pipe;
-use wayland_protocols::ext::data_control::v1::client::{
-    ext_data_control_device_v1, ext_data_control_manager_v1, ext_data_control_offer_v1,
-    ext_data_control_source_v1,
+use wayland_protocols_wlr::data_control::v1::client::{
+    zwlr_data_control_device_v1, zwlr_data_control_manager_v1, zwlr_data_control_offer_v1,
+    zwlr_data_control_source_v1,
 };
 
 use crate::{
@@ -21,7 +21,7 @@ use crate::{
     WlListenType,
 };
 
-impl Dispatch<wl_registry::WlRegistry, ()> for WlClipboardListenerStream {
+impl Dispatch<wl_registry::WlRegistry, ()> for WlClipboardListenerStreamWlr {
     fn event(
         state: &mut Self,
         registry: &wl_registry::WlRegistry,
@@ -39,10 +39,10 @@ impl Dispatch<wl_registry::WlRegistry, ()> for WlClipboardListenerStream {
             if interface == wl_seat::WlSeat::interface().name {
                 state.seat = Some(registry.bind::<wl_seat::WlSeat, _, _>(name, version, qh, ()));
             } else if interface
-                == ext_data_control_manager_v1::ExtDataControlManagerV1::interface().name
+                == zwlr_data_control_manager_v1::ZwlrDataControlManagerV1::interface().name
             {
                 state.data_manager = Some(
-                    registry.bind::<ext_data_control_manager_v1::ExtDataControlManagerV1, _, _>(
+                    registry.bind::<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, _, _>(
                         name,
                         version,
                         qh,
@@ -54,7 +54,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for WlClipboardListenerStream {
     }
 }
 
-impl Dispatch<wl_seat::WlSeat, ()> for WlClipboardListenerStream {
+impl Dispatch<wl_seat::WlSeat, ()> for WlClipboardListenerStreamWlr {
     fn event(
         state: &mut Self,
         _proxy: &wl_seat::WlSeat,
@@ -69,13 +69,13 @@ impl Dispatch<wl_seat::WlSeat, ()> for WlClipboardListenerStream {
     }
 }
 
-impl Dispatch<ext_data_control_manager_v1::ExtDataControlManagerV1, ()>
-    for WlClipboardListenerStream
+impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()>
+    for WlClipboardListenerStreamWlr
 {
     fn event(
         _state: &mut Self,
-        _proxy: &ext_data_control_manager_v1::ExtDataControlManagerV1,
-        _event: <ext_data_control_manager_v1::ExtDataControlManagerV1 as Proxy>::Event,
+        _proxy: &zwlr_data_control_manager_v1::ZwlrDataControlManagerV1,
+        _event: <zwlr_data_control_manager_v1::ZwlrDataControlManagerV1 as Proxy>::Event,
         _data: &(),
         _conn: &wayland_client::Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
@@ -83,19 +83,19 @@ impl Dispatch<ext_data_control_manager_v1::ExtDataControlManagerV1, ()>
     }
 }
 
-impl Dispatch<ext_data_control_device_v1::ExtDataControlDeviceV1, ()>
-    for WlClipboardListenerStream
+impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
+    for WlClipboardListenerStreamWlr
 {
     fn event(
         state: &mut Self,
-        _proxy: &ext_data_control_device_v1::ExtDataControlDeviceV1,
-        event: <ext_data_control_device_v1::ExtDataControlDeviceV1 as Proxy>::Event,
+        _proxy: &zwlr_data_control_device_v1::ZwlrDataControlDeviceV1,
+        event: <zwlr_data_control_device_v1::ZwlrDataControlDeviceV1 as Proxy>::Event,
         _data: &(),
         _conn: &Connection,
         qh: &wayland_client::QueueHandle<Self>,
     ) {
         match event {
-            ext_data_control_device_v1::Event::DataOffer { id } => {
+            zwlr_data_control_device_v1::Event::DataOffer { id } => {
                 if state.copy_data.is_some() {
                     return;
                 }
@@ -107,7 +107,7 @@ impl Dispatch<ext_data_control_device_v1::ExtDataControlDeviceV1, ()>
                     state.pipereader = Some(read);
                 }
             }
-            ext_data_control_device_v1::Event::Finished => {
+            zwlr_data_control_device_v1::Event::Finished => {
                 let source = state
                     .data_manager
                     .as_ref()
@@ -119,12 +119,12 @@ impl Dispatch<ext_data_control_device_v1::ExtDataControlDeviceV1, ()>
                     .unwrap()
                     .set_selection(Some(&source));
             }
-            ext_data_control_device_v1::Event::PrimarySelection { id } => {
+            zwlr_data_control_device_v1::Event::PrimarySelection { id } => {
                 if let Some(offer) = id {
                     offer.destroy();
                 }
             }
-            ext_data_control_device_v1::Event::Selection { id } => {
+            zwlr_data_control_device_v1::Event::Selection { id } => {
                 let Some(offer) = id else {
                     return;
                 };
@@ -133,7 +133,7 @@ impl Dispatch<ext_data_control_device_v1::ExtDataControlDeviceV1, ()>
                     return;
                 }
                 // TODO: how can I handle the mimetype?
-                let select_mimetype = |state: &WlClipboardListenerStream| {
+                let select_mimetype = |state: &WlClipboardListenerStreamWlr| {
                     if state.is_text() || state.mime_types.is_empty() {
                         TEXT.to_string()
                     } else {
@@ -162,24 +162,24 @@ impl Dispatch<ext_data_control_device_v1::ExtDataControlDeviceV1, ()>
             }
         }
     }
-    event_created_child!(WlClipboardListenerStream, ext_data_control_device_v1::ExtDataControlDeviceV1, [
-        ext_data_control_device_v1::EVT_DATA_OFFER_OPCODE => (ext_data_control_offer_v1::ExtDataControlOfferV1, ())
+    event_created_child!(WlClipboardListenerStreamWlr, zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, [
+        zwlr_data_control_device_v1::EVT_DATA_OFFER_OPCODE => (zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ())
     ]);
 }
 
-impl Dispatch<ext_data_control_source_v1::ExtDataControlSourceV1, ()>
-    for WlClipboardListenerStream
+impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()>
+    for WlClipboardListenerStreamWlr
 {
     fn event(
         state: &mut Self,
-        _proxy: &ext_data_control_source_v1::ExtDataControlSourceV1,
-        event: <ext_data_control_source_v1::ExtDataControlSourceV1 as Proxy>::Event,
+        _proxy: &zwlr_data_control_source_v1::ZwlrDataControlSourceV1,
+        event: <zwlr_data_control_source_v1::ZwlrDataControlSourceV1 as Proxy>::Event,
         _data: &(),
         _conn: &Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
         match event {
-            ext_data_control_source_v1::Event::Send { fd, mime_type } => {
+            zwlr_data_control_source_v1::Event::Send { fd, mime_type } => {
                 let Some(data) = state.copy_data.as_ref() else {
                     return;
                 };
@@ -189,7 +189,7 @@ impl Dispatch<ext_data_control_source_v1::ExtDataControlSourceV1, ()>
                     f.write_all(&data.to_vec()).unwrap();
                 }
             }
-            ext_data_control_source_v1::Event::Cancelled => state.copy_cancelled = true,
+            zwlr_data_control_source_v1::Event::Cancelled => state.copy_cancelled = true,
             _ => {
                 eprintln!("unhandled event: {event:?}");
             }
@@ -197,16 +197,16 @@ impl Dispatch<ext_data_control_source_v1::ExtDataControlSourceV1, ()>
     }
 }
 
-impl Dispatch<ext_data_control_offer_v1::ExtDataControlOfferV1, ()> for WlClipboardListenerStream {
+impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()> for WlClipboardListenerStreamWlr {
     fn event(
         state: &mut Self,
-        _proxy: &ext_data_control_offer_v1::ExtDataControlOfferV1,
-        event: <ext_data_control_offer_v1::ExtDataControlOfferV1 as Proxy>::Event,
+        _proxy: &zwlr_data_control_offer_v1::ZwlrDataControlOfferV1,
+        event: <zwlr_data_control_offer_v1::ZwlrDataControlOfferV1 as Proxy>::Event,
         _data: &(),
         _conn: &Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
-        if let ext_data_control_offer_v1::Event::Offer { mime_type } = event {
+        if let zwlr_data_control_offer_v1::Event::Offer { mime_type } = event {
             state.mime_types.push(mime_type);
         }
     }
