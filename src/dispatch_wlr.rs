@@ -197,7 +197,9 @@ impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()>
     }
 }
 
-impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()> for WlClipboardListenerStreamWlr {
+impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()>
+    for WlClipboardListenerStreamWlr
+{
     fn event(
         state: &mut Self,
         _proxy: &zwlr_data_control_offer_v1::ZwlrDataControlOfferV1,
