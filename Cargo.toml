@@ -20,16 +20,20 @@ members = [".", "marine-clipboard-tools"]
 wayland-clipboard-listener = { version = "0.5.0", path = "./" }
 
 [dependencies]
-wayland-protocols = { version = "0.32.8", default-features = false, features = [
+wayland-protocols = { version = "0.32.9", default-features = false, features = [
 	"unstable",
 	"client",
+	"staging",
 ] }
 
 
 wayland-client = "0.31.10"
 wayland-protocols-wlr = { version = "0.3.8", default-features = false, features = [
 	"client",
-] }
+], optional = true }
 os_pipe = "1.2.2"
 thiserror = "2.0.12"
 log = "0.4.27"
+
+[features]
+wlr-data-control = ["wayland-protocols-wlr"]
