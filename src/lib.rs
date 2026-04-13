@@ -399,8 +399,12 @@ impl WlClipboardListenerStream {
             queue.blocking_dispatch(self)?;
         }
 
-        // roundtrip to init pipereader
-        queue.roundtrip(self)?;
+        // Flush the receive request so the source can start writing, but avoid
+        // a full roundtrip which can race in a newer selection and replace the
+        // pipe reader we are about to consume.
+        queue
+            .flush()
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         let mut read = self.pipereader.as_ref().unwrap();
         let mut context = vec![];
         read.read_to_end(&mut context)
@@ -427,8 +431,9 @@ impl WlClipboardListenerStream {
             .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         queue.blocking_dispatch(self)?;
         if self.pipereader.is_some() {
-            // roundtrip to init pipereader
-            queue.roundtrip(self)?;
+            queue
+                .flush()
+                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
             let mut read = self.pipereader.as_ref().unwrap();
             let mut context = vec![];
             read.read_to_end(&mut context)
@@ -688,8 +693,12 @@ impl WlClipboardListenerStreamWlr {
             queue.blocking_dispatch(self)?;
         }
 
-        // roundtrip to init pipereader
-        queue.roundtrip(self)?;
+        // Flush the receive request so the source can start writing, but avoid
+        // a full roundtrip which can race in a newer selection and replace the
+        // pipe reader we are about to consume.
+        queue
+            .flush()
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         let mut read = self.pipereader.as_ref().unwrap();
         let mut context = vec![];
         read.read_to_end(&mut context)
@@ -716,8 +725,9 @@ impl WlClipboardListenerStreamWlr {
             .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         queue.blocking_dispatch(self)?;
         if self.pipereader.is_some() {
-            // roundtrip to init pipereader
-            queue.roundtrip(self)?;
+            queue
+                .flush()
+                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
             let mut read = self.pipereader.as_ref().unwrap();
             let mut context = vec![];
             read.read_to_end(&mut context)
