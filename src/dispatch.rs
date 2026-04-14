@@ -198,7 +198,7 @@ impl Dispatch<ext_data_control_source_v1::ExtDataControlSourceV1, ()>
 impl Dispatch<ext_data_control_offer_v1::ExtDataControlOfferV1, ()> for WlClipboardListenerStream {
     fn event(
         state: &mut Self,
-        _proxy: &ext_data_control_offer_v1::ExtDataControlOfferV1,
+        proxy: &ext_data_control_offer_v1::ExtDataControlOfferV1,
         event: <ext_data_control_offer_v1::ExtDataControlOfferV1 as Proxy>::Event,
         _data: &(),
         _conn: &Connection,
@@ -207,7 +207,7 @@ impl Dispatch<ext_data_control_offer_v1::ExtDataControlOfferV1, ()> for WlClipbo
         if let ext_data_control_offer_v1::Event::Offer { mime_type } = event {
             state
                 .offer_mime_types
-                .entry(_proxy.id().protocol_id())
+                .entry(proxy.id().protocol_id())
                 .or_default()
                 .push(mime_type);
         }
