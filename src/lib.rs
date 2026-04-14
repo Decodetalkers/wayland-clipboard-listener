@@ -120,17 +120,18 @@ mod dispatch;
 #[cfg(feature = "wlr-data-control")]
 mod dispatch_wlr;
 
+use std::collections::HashMap;
 use std::io::Read;
 
-use wayland_client::{protocol::wl_seat, Connection, DispatchError, EventQueue};
+use wayland_client::{protocol::wl_seat, Connection, DispatchError, EventQueue, Proxy};
 
 use wayland_protocols::ext::data_control::v1::client::{
-    ext_data_control_device_v1, ext_data_control_manager_v1,
+    ext_data_control_device_v1, ext_data_control_manager_v1, ext_data_control_offer_v1,
 };
 
 #[cfg(feature = "wlr-data-control")]
 use wayland_protocols_wlr::data_control::v1::client::{
-    zwlr_data_control_device_v1, zwlr_data_control_manager_v1,
+    zwlr_data_control_device_v1, zwlr_data_control_manager_v1, zwlr_data_control_offer_v1,
 };
 
 use std::sync::{Arc, Mutex};
@@ -278,7 +279,10 @@ pub struct WlClipboardListenerStream {
     seat_name: Option<String>,
     data_manager: Option<ext_data_control_manager_v1::ExtDataControlManagerV1>,
     data_device: Option<ext_data_control_device_v1::ExtDataControlDeviceV1>,
+    offer_mime_types: HashMap<u32, Vec<String>>,
     mime_types: Vec<String>,
+    selection_offer: Option<ext_data_control_offer_v1::ExtDataControlOfferV1>,
+    primary_selection_offer: Option<ext_data_control_offer_v1::ExtDataControlOfferV1>,
     set_priority: Option<Vec<String>>,
     pipereader: Option<os_pipe::PipeReader>,
     current_type: Option<String>,
@@ -319,7 +323,10 @@ impl WlClipboardListenerStream {
             seat_name: None,
             data_manager: None,
             data_device: None,
+            offer_mime_types: HashMap::new(),
             mime_types: Vec::new(),
+            selection_offer: None,
+            primary_selection_offer: None,
             set_priority: None,
             pipereader: None,
             current_type: None,
@@ -399,8 +406,12 @@ impl WlClipboardListenerStream {
             queue.blocking_dispatch(self)?;
         }
 
-        // roundtrip to init pipereader
-        queue.roundtrip(self)?;
+        // Flush the receive request so the source can start writing, but avoid
+        // a full roundtrip which can race in a newer selection and replace the
+        // pipe reader we are about to consume.
+        queue
+            .flush()
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         let mut read = self.pipereader.as_ref().unwrap();
         let mut context = vec![];
         read.read_to_end(&mut context)
@@ -427,8 +438,9 @@ impl WlClipboardListenerStream {
             .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         queue.blocking_dispatch(self)?;
         if self.pipereader.is_some() {
-            // roundtrip to init pipereader
-            queue.roundtrip(self)?;
+            queue
+                .flush()
+                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
             let mut read = self.pipereader.as_ref().unwrap();
             let mut context = vec![];
             read.read_to_end(&mut context)
@@ -462,6 +474,47 @@ impl WlClipboardListenerStream {
         !self.mime_types.is_empty()
             && self.mime_types.contains(&TEXT.to_string())
             && !self.mime_types.contains(&IMAGE.to_string())
+    }
+
+    fn replace_selection_offer(
+        &mut self,
+        offer: Option<ext_data_control_offer_v1::ExtDataControlOfferV1>,
+    ) {
+        if let Some(old_offer) = self.selection_offer.take() {
+            self.offer_mime_types.remove(&old_offer.id().protocol_id());
+            old_offer.destroy();
+        }
+
+        self.mime_types = offer
+            .as_ref()
+            .and_then(|offer| self.offer_mime_types.remove(&offer.id().protocol_id()))
+            .unwrap_or_default();
+
+        self.selection_offer = offer;
+    }
+
+    fn replace_primary_selection_offer(
+        &mut self,
+        offer: Option<ext_data_control_offer_v1::ExtDataControlOfferV1>,
+    ) {
+        if let Some(old_offer) = self.primary_selection_offer.take() {
+            self.offer_mime_types.remove(&old_offer.id().protocol_id());
+            old_offer.destroy();
+        }
+
+        self.primary_selection_offer = offer;
+    }
+
+    fn clear_offers(&mut self) {
+        if let Some(offer) = self.selection_offer.take() {
+            offer.destroy();
+        }
+        if let Some(offer) = self.primary_selection_offer.take() {
+            offer.destroy();
+        }
+
+        self.offer_mime_types.clear();
+        self.mime_types.clear();
     }
 }
 
@@ -565,7 +618,10 @@ pub struct WlClipboardListenerStreamWlr {
     seat_name: Option<String>,
     data_manager: Option<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1>,
     data_device: Option<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1>,
+    offer_mime_types: HashMap<u32, Vec<String>>,
     mime_types: Vec<String>,
+    selection_offer: Option<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1>,
+    primary_selection_offer: Option<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1>,
     set_priority: Option<Vec<String>>,
     pipereader: Option<os_pipe::PipeReader>,
     current_type: Option<String>,
@@ -608,7 +664,10 @@ impl WlClipboardListenerStreamWlr {
             seat_name: None,
             data_manager: None,
             data_device: None,
+            offer_mime_types: HashMap::new(),
             mime_types: Vec::new(),
+            selection_offer: None,
+            primary_selection_offer: None,
             set_priority: None,
             pipereader: None,
             current_type: None,
@@ -688,8 +747,12 @@ impl WlClipboardListenerStreamWlr {
             queue.blocking_dispatch(self)?;
         }
 
-        // roundtrip to init pipereader
-        queue.roundtrip(self)?;
+        // Flush the receive request so the source can start writing, but avoid
+        // a full roundtrip which can race in a newer selection and replace the
+        // pipe reader we are about to consume.
+        queue
+            .flush()
+            .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         let mut read = self.pipereader.as_ref().unwrap();
         let mut context = vec![];
         read.read_to_end(&mut context)
@@ -716,8 +779,9 @@ impl WlClipboardListenerStreamWlr {
             .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
         queue.blocking_dispatch(self)?;
         if self.pipereader.is_some() {
-            // roundtrip to init pipereader
-            queue.roundtrip(self)?;
+            queue
+                .flush()
+                .map_err(|e| WlClipboardListenerError::QueueError(e.to_string()))?;
             let mut read = self.pipereader.as_ref().unwrap();
             let mut context = vec![];
             read.read_to_end(&mut context)
@@ -751,5 +815,46 @@ impl WlClipboardListenerStreamWlr {
         !self.mime_types.is_empty()
             && self.mime_types.contains(&TEXT.to_string())
             && !self.mime_types.contains(&IMAGE.to_string())
+    }
+
+    fn replace_selection_offer(
+        &mut self,
+        offer: Option<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1>,
+    ) {
+        if let Some(old_offer) = self.selection_offer.take() {
+            self.offer_mime_types.remove(&old_offer.id().protocol_id());
+            old_offer.destroy();
+        }
+
+        self.mime_types = offer
+            .as_ref()
+            .and_then(|offer| self.offer_mime_types.remove(&offer.id().protocol_id()))
+            .unwrap_or_default();
+
+        self.selection_offer = offer;
+    }
+
+    fn replace_primary_selection_offer(
+        &mut self,
+        offer: Option<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1>,
+    ) {
+        if let Some(old_offer) = self.primary_selection_offer.take() {
+            self.offer_mime_types.remove(&old_offer.id().protocol_id());
+            old_offer.destroy();
+        }
+
+        self.primary_selection_offer = offer;
+    }
+
+    fn clear_offers(&mut self) {
+        if let Some(offer) = self.selection_offer.take() {
+            offer.destroy();
+        }
+        if let Some(offer) = self.primary_selection_offer.take() {
+            offer.destroy();
+        }
+
+        self.offer_mime_types.clear();
+        self.mime_types.clear();
     }
 }

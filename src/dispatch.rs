@@ -96,10 +96,14 @@ impl Dispatch<ext_data_control_device_v1::ExtDataControlDeviceV1, ()>
     ) {
         match event {
             ext_data_control_device_v1::Event::DataOffer { id } => {
-                if state.copy_data.is_some() {
-                    return;
-                }
+                state
+                    .offer_mime_types
+                    .entry(id.id().protocol_id())
+                    .or_default();
                 if let WlListenType::ListenOnSelect = state.listentype {
+                    if state.copy_data.is_some() {
+                        return;
+                    }
                     let (read, write) = pipe().unwrap();
                     state.current_type = Some(TEXT.to_string());
                     id.receive(TEXT.to_string(), write.as_fd());
@@ -108,30 +112,24 @@ impl Dispatch<ext_data_control_device_v1::ExtDataControlDeviceV1, ()>
                 }
             }
             ext_data_control_device_v1::Event::Finished => {
-                let source = state
-                    .data_manager
-                    .as_ref()
-                    .unwrap()
-                    .create_data_source(qh, ());
-                state
-                    .data_device
-                    .as_ref()
-                    .unwrap()
-                    .set_selection(Some(&source));
+                state.clear_offers();
+                if let Some(device) = state.data_device.take() {
+                    device.destroy();
+                }
+                state.set_data_device(qh);
             }
             ext_data_control_device_v1::Event::PrimarySelection { id } => {
-                if let Some(offer) = id {
-                    offer.destroy();
-                }
+                state.replace_primary_selection_offer(id);
             }
             ext_data_control_device_v1::Event::Selection { id } => {
-                let Some(offer) = id else {
-                    return;
-                };
+                state.replace_selection_offer(id.clone());
                 // if is copying, not run this
                 if state.copy_data.is_some() {
                     return;
                 }
+                let Some(offer) = id else {
+                    return;
+                };
                 // TODO: how can I handle the mimetype?
                 let select_mimetype = |state: &WlClipboardListenerStream| {
                     if state.is_text() || state.mime_types.is_empty() {
@@ -200,14 +198,18 @@ impl Dispatch<ext_data_control_source_v1::ExtDataControlSourceV1, ()>
 impl Dispatch<ext_data_control_offer_v1::ExtDataControlOfferV1, ()> for WlClipboardListenerStream {
     fn event(
         state: &mut Self,
-        _proxy: &ext_data_control_offer_v1::ExtDataControlOfferV1,
+        proxy: &ext_data_control_offer_v1::ExtDataControlOfferV1,
         event: <ext_data_control_offer_v1::ExtDataControlOfferV1 as Proxy>::Event,
         _data: &(),
         _conn: &Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
         if let ext_data_control_offer_v1::Event::Offer { mime_type } = event {
-            state.mime_types.push(mime_type);
+            state
+                .offer_mime_types
+                .entry(proxy.id().protocol_id())
+                .or_default()
+                .push(mime_type);
         }
     }
 }
