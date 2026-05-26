@@ -1,4 +1,5 @@
 use super::WlClipboardListenerStream;
+use tracing::{info, instrument};
 
 use std::fs::File;
 use std::io::Write;
@@ -22,6 +23,7 @@ use crate::{
 };
 
 impl Dispatch<wl_registry::WlRegistry, ()> for WlClipboardListenerStream {
+    #[instrument(skip(state, registry, _data, _conn, qh))]
     fn event(
         state: &mut Self,
         registry: &wl_registry::WlRegistry,
@@ -55,6 +57,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for WlClipboardListenerStream {
 }
 
 impl Dispatch<wl_seat::WlSeat, ()> for WlClipboardListenerStream {
+    #[instrument(skip(state, _proxy, _data, _conn, _qhandle))]
     fn event(
         state: &mut Self,
         _proxy: &wl_seat::WlSeat,
@@ -72,6 +75,7 @@ impl Dispatch<wl_seat::WlSeat, ()> for WlClipboardListenerStream {
 impl Dispatch<ext_data_control_manager_v1::ExtDataControlManagerV1, ()>
     for WlClipboardListenerStream
 {
+    #[instrument(skip(_state, _proxy, _event, _data, _conn, _qhandle))]
     fn event(
         _state: &mut Self,
         _proxy: &ext_data_control_manager_v1::ExtDataControlManagerV1,
@@ -86,6 +90,7 @@ impl Dispatch<ext_data_control_manager_v1::ExtDataControlManagerV1, ()>
 impl Dispatch<ext_data_control_device_v1::ExtDataControlDeviceV1, ()>
     for WlClipboardListenerStream
 {
+    #[instrument(skip(state, _proxy, _data, _conn, qh))]
     fn event(
         state: &mut Self,
         _proxy: &ext_data_control_device_v1::ExtDataControlDeviceV1,
@@ -156,7 +161,7 @@ impl Dispatch<ext_data_control_device_v1::ExtDataControlDeviceV1, ()>
                 }
             }
             _ => {
-                log::info!("unhandled event: {event:?}");
+                info!("unhandled event: {event:?}");
             }
         }
     }
@@ -168,6 +173,7 @@ impl Dispatch<ext_data_control_device_v1::ExtDataControlDeviceV1, ()>
 impl Dispatch<ext_data_control_source_v1::ExtDataControlSourceV1, ()>
     for WlClipboardListenerStream
 {
+    #[instrument(skip(state, _proxy, _data, _conn, _qhandle))]
     fn event(
         state: &mut Self,
         _proxy: &ext_data_control_source_v1::ExtDataControlSourceV1,
@@ -196,6 +202,7 @@ impl Dispatch<ext_data_control_source_v1::ExtDataControlSourceV1, ()>
 }
 
 impl Dispatch<ext_data_control_offer_v1::ExtDataControlOfferV1, ()> for WlClipboardListenerStream {
+    #[instrument(skip(state, proxy, _data, _conn, _qhandle))]
     fn event(
         state: &mut Self,
         proxy: &ext_data_control_offer_v1::ExtDataControlOfferV1,

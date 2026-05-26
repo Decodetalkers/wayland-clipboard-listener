@@ -122,6 +122,7 @@ mod dispatch_wlr;
 
 use std::collections::HashMap;
 use std::io::Read;
+use tracing::instrument;
 
 use wayland_client::{protocol::wl_seat, Connection, DispatchError, EventQueue, Proxy};
 
@@ -194,6 +195,7 @@ impl WlClipboardPasteStream {
     /// init a paste steam, you can use WlListenType::ListenOnSelect to watch the select event
     /// It can just listen on text
     /// use ListenOnCopy will receive the mimetype, can copy many types
+    #[instrument]
     pub fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
         Ok(Self {
             inner: WlClipboardListenerStream::init(listentype)?,
@@ -306,6 +308,7 @@ impl Iterator for WlClipboardListenerStream {
 impl WlClipboardListenerStream {
     /// private init
     /// to init a stream
+    #[instrument]
     fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
         let conn = Connection::connect_to_env().map_err(|_| {
             WlClipboardListenerError::InitFailed("Cannot connect to wayland".to_string())
@@ -360,6 +363,7 @@ impl WlClipboardListenerStream {
     /// pass [Vec<u8>] as data
     /// now it can just copy text
     /// It will always live in the background, so you need to handle it yourself
+    #[instrument(skip(self, data))]
     fn copy_to_clipboard(
         &mut self,
         data: Vec<u8>,
@@ -396,6 +400,7 @@ impl WlClipboardListenerStream {
 
     /// get data from clipboard for once
     /// it is also used in iter
+    #[instrument(skip(self))]
     fn get_clipboard_sync(&mut self) -> Result<ClipBoardListenMessage, WlClipboardListenerError> {
         // get queue, start blocking_dispatch for first loop
         let queue = self.queue.clone().unwrap();
@@ -428,6 +433,7 @@ impl WlClipboardListenerStream {
 
     /// get data from clipboard for once
     /// it is also used in iter
+    #[instrument(skip(self))]
     fn try_get_clipboard(
         &mut self,
     ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
@@ -529,6 +535,7 @@ impl WlClipboardPasteStreamWlr {
     /// init a paste steam, you can use WlListenType::ListenOnSelect to watch the select event
     /// It can just listen on text
     /// use ListenOnCopy will receive the mimetype, can copy many types
+    #[instrument]
     pub fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
         Ok(Self {
             inner: WlClipboardListenerStreamWlr::init(listentype)?,
@@ -647,6 +654,7 @@ impl Iterator for WlClipboardListenerStreamWlr {
 impl WlClipboardListenerStreamWlr {
     /// private init
     /// to init a stream
+    #[instrument]
     fn init(listentype: WlListenType) -> Result<Self, WlClipboardListenerError> {
         let conn = Connection::connect_to_env().map_err(|_| {
             WlClipboardListenerError::InitFailed("Cannot connect to wayland".to_string())
@@ -701,6 +709,7 @@ impl WlClipboardListenerStreamWlr {
     /// pass [Vec<u8>] as data
     /// now it can just copy text
     /// It will always live in the background, so you need to handle it yourself
+    #[instrument(skip(self, data))]
     fn copy_to_clipboard(
         &mut self,
         data: Vec<u8>,
@@ -737,6 +746,7 @@ impl WlClipboardListenerStreamWlr {
 
     /// get data from clipboard for once
     /// it is also used in iter
+    #[instrument(skip(self))]
     fn get_clipboard_sync(&mut self) -> Result<ClipBoardListenMessage, WlClipboardListenerError> {
         // get queue, start blocking_dispatch for first loop
         let queue = self.queue.clone().unwrap();
@@ -769,6 +779,7 @@ impl WlClipboardListenerStreamWlr {
 
     /// get data from clipboard for once
     /// it is also used in iter
+    #[instrument(skip(self))]
     fn try_get_clipboard(
         &mut self,
     ) -> Result<Option<ClipBoardListenMessage>, WlClipboardListenerError> {
