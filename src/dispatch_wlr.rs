@@ -1,4 +1,5 @@
 use super::WlClipboardListenerStreamWlr;
+use tracing::{info, instrument};
 
 use std::fs::File;
 use std::io::Write;
@@ -22,6 +23,7 @@ use crate::{
 };
 
 impl Dispatch<wl_registry::WlRegistry, ()> for WlClipboardListenerStreamWlr {
+    #[instrument(skip(state, registry, _data, _conn, qh))]
     fn event(
         state: &mut Self,
         registry: &wl_registry::WlRegistry,
@@ -55,6 +57,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for WlClipboardListenerStreamWlr {
 }
 
 impl Dispatch<wl_seat::WlSeat, ()> for WlClipboardListenerStreamWlr {
+    #[instrument(skip(state, _proxy, _data, _conn, _qhandle))]
     fn event(
         state: &mut Self,
         _proxy: &wl_seat::WlSeat,
@@ -72,6 +75,7 @@ impl Dispatch<wl_seat::WlSeat, ()> for WlClipboardListenerStreamWlr {
 impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()>
     for WlClipboardListenerStreamWlr
 {
+    #[instrument(skip(_state, _proxy, _event, _data, _conn, _qhandle))]
     fn event(
         _state: &mut Self,
         _proxy: &zwlr_data_control_manager_v1::ZwlrDataControlManagerV1,
@@ -86,6 +90,7 @@ impl Dispatch<zwlr_data_control_manager_v1::ZwlrDataControlManagerV1, ()>
 impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
     for WlClipboardListenerStreamWlr
 {
+    #[instrument(skip(state, _proxy, _data, _conn, qh))]
     fn event(
         state: &mut Self,
         _proxy: &zwlr_data_control_device_v1::ZwlrDataControlDeviceV1,
@@ -156,7 +161,7 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
                 }
             }
             _ => {
-                log::info!("unhandled event: {event:?}");
+                info!("unhandled event: {event:?}");
             }
         }
     }
@@ -168,6 +173,7 @@ impl Dispatch<zwlr_data_control_device_v1::ZwlrDataControlDeviceV1, ()>
 impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()>
     for WlClipboardListenerStreamWlr
 {
+    #[instrument(skip(state, _proxy, _data, _conn, _qhandle))]
     fn event(
         state: &mut Self,
         _proxy: &zwlr_data_control_source_v1::ZwlrDataControlSourceV1,
@@ -198,6 +204,7 @@ impl Dispatch<zwlr_data_control_source_v1::ZwlrDataControlSourceV1, ()>
 impl Dispatch<zwlr_data_control_offer_v1::ZwlrDataControlOfferV1, ()>
     for WlClipboardListenerStreamWlr
 {
+    #[instrument(skip(state, proxy, _data, _conn, _qhandle))]
     fn event(
         state: &mut Self,
         proxy: &zwlr_data_control_offer_v1::ZwlrDataControlOfferV1,

@@ -7,6 +7,7 @@ use wayland_clipboard_listener::{WlClipboardCopyStream, WlClipboardListenerError
 use std::io::{stdin, Read};
 
 fn main() -> Result<(), WlClipboardListenerError> {
+    tracing_subscriber::fmt::init();
     let args = std::env::args();
     let context = {
         let len = args.len();
